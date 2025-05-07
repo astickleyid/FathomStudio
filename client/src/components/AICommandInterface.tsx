@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Bot, Sparkles, MessageSquareMore, X, ChevronUp, ChevronDown, Brain, List } from 'lucide-react';
 import { AISuggestion } from '@shared/schema';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMobile } from '@/hooks/use-mobile';
 
 interface AICommandInterfaceProps {
   onProcessCommand: (command: string) => Promise<any>;
@@ -27,6 +28,7 @@ export default function AICommandInterface({
   const [isExamplesOpen, setIsExamplesOpen] = useState(false);
   const [isSuggestionsPanelOpen, setIsSuggestionsPanelOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('mixing');
+  const isMobile = useMobile();
   const queryClient = useQueryClient();
   
   // Fetch AI suggestions for the current project
@@ -120,49 +122,51 @@ export default function AICommandInterface({
     <div className="p-3 border-t border-[#333333] relative">
       {/* Example Commands Panel */}
       {isExamplesOpen && (
-        <div className="absolute bottom-full left-0 w-full p-4 bg-[#191919] border border-[#333333] rounded-t-lg shadow-lg z-10">
+        <div className={`absolute bottom-full left-0 w-full ${isMobile ? 'p-3' : 'p-4'} bg-[#191919] border border-[#333333] rounded-t-lg shadow-lg z-10`}>
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-medium">What can Fathom AI help you with?</h3>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`}>What can Fathom AI help you with?</h3>
             <button 
               onClick={() => setIsExamplesOpen(false)}
               className="p-1 hover:bg-[#333333] rounded-full"
             >
-              <X className="w-4 h-4" />
+              <X className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
             </button>
           </div>
           
-          <div className="flex space-x-2 mb-4 overflow-x-auto pb-2">
+          <div className="flex space-x-1.5 mb-3 overflow-x-auto pb-1.5">
             {commandCategories.map(category => (
               <button
                 key={category.id}
                 onClick={() => setActiveCategory(category.id)}
-                className={`px-3 py-1.5 rounded-full text-xs flex items-center whitespace-nowrap ${
+                className={`${isMobile ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-xs'} rounded-full flex items-center whitespace-nowrap ${
                   activeCategory === category.id 
                     ? 'bg-[#FF7A00] text-white' 
                     : 'bg-[#252525] text-[#999999] hover:bg-[#333333] hover:text-white'
                 }`}
               >
                 {category.icon}
-                <span className="ml-1.5">{category.name}</span>
+                <span className={`${isMobile ? 'ml-1' : 'ml-1.5'}`}>{category.name}</span>
               </button>
             ))}
           </div>
           
-          <div className="space-y-2">
+          <div className={`space-y-${isMobile ? '1.5' : '2'}`}>
             {currentCategory.exampleCommands.map((example, i) => (
               <button
                 key={i}
                 onClick={() => handleUseExample(example)}
-                className="w-full text-left text-xs bg-[#252525] hover:bg-[#333333] p-2 rounded transition-colors"
+                className={`w-full text-left ${isMobile ? 'text-[10px] p-1.5' : 'text-xs p-2'} bg-[#252525] hover:bg-[#333333] rounded transition-colors`}
               >
                 {example}
               </button>
             ))}
           </div>
           
-          <div className="mt-4 pt-3 border-t border-[#333333] text-xs text-[#999999]">
-            <p>Fathom AI can help with mixing, creative ideas, technical questions, and more. Just ask in natural language!</p>
-          </div>
+          {!isMobile && (
+            <div className="mt-4 pt-3 border-t border-[#333333] text-xs text-[#999999]">
+              <p>Fathom AI can help with mixing, creative ideas, technical questions, and more. Just ask in natural language!</p>
+            </div>
+          )}
         </div>
       )}
       
@@ -214,29 +218,29 @@ export default function AICommandInterface({
       
       {/* Command Input Form */}
       <form onSubmit={handleSubmit}>
-        <div className={`relative rounded-3xl transition-all duration-300 p-2 flex items-center ${isProcessing ? 'bg-gradient-to-b from-[#333333] to-[#252525]' : 'bg-gradient-to-b from-[#252525] to-[#1A1A1A]'} border border-[#333333]`}>
+        <div className={`relative rounded-3xl transition-all duration-300 ${isMobile ? 'p-1.5' : 'p-2'} flex items-center ${isProcessing ? 'bg-gradient-to-b from-[#333333] to-[#252525]' : 'bg-gradient-to-b from-[#252525] to-[#1A1A1A]'} border border-[#333333]`}>
           <div 
-            className="w-8 h-8 bg-gradient-to-br from-[#FF7A00] to-[#CC6200] rounded-full flex items-center justify-center text-white font-bold shadow-md mr-2 flex-shrink-0 cursor-pointer"
+            className={`${isMobile ? 'w-7 h-7' : 'w-8 h-8'} bg-gradient-to-br from-[#FF7A00] to-[#CC6200] rounded-full flex items-center justify-center text-white font-bold shadow-md mr-2 flex-shrink-0 cursor-pointer`}
             onClick={() => setIsExamplesOpen(!isExamplesOpen)}
           >
             {isProcessing ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <div className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'} border-2 border-white border-t-transparent rounded-full animate-spin`}></div>
             ) : (
-              <Bot className="w-4 h-4" />
+              <Bot className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
             )}
           </div>
           <input 
             type="text" 
             value={command}
             onChange={handleInputChange}
-            placeholder={isProcessing ? "Processing..." : `Ask Fathom AI for music production help...`}
-            className="w-full bg-transparent border-none focus:outline-none text-sm"
+            placeholder={isProcessing ? "Processing..." : isMobile ? "Ask Fathom AI..." : "Ask Fathom AI for music production help..."}
+            className={`w-full bg-transparent border-none focus:outline-none ${isMobile ? 'text-xs' : 'text-sm'}`}
             disabled={isProcessing || !isConnected || !projectId}
           />
           {command && (
             <button
               type="submit" 
-              className="ml-2 px-3 py-1 bg-[#FF7A00] hover:bg-[#CC6200] text-white text-xs font-medium rounded-full transition-colors"
+              className={`ml-2 ${isMobile ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-1 text-xs'} bg-[#FF7A00] hover:bg-[#CC6200] text-white font-medium rounded-full transition-colors`}
               disabled={isProcessing || !isConnected || !projectId}
             >
               Send
@@ -246,27 +250,30 @@ export default function AICommandInterface({
       </form>
       
       {/* Bottom Controls */}
-      <div className="mt-3 flex justify-between">
-        <div className="text-xs text-[#999999] flex items-center">
-          <span className={`inline-block w-2 h-2 rounded-full mr-1 ${isConnected && projectId ? 'bg-green-500' : 'bg-red-500'}`}></span>
+      <div className={`${isMobile ? 'mt-2' : 'mt-3'} flex justify-between`}>
+        <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-[#999999] flex items-center`}>
+          <span className={`inline-block ${isMobile ? 'w-1.5 h-1.5' : 'w-2 h-2'} rounded-full mr-1 ${isConnected && projectId ? 'bg-green-500' : 'bg-red-500'}`}></span>
           Fathom AI
           {!isConnected && " (Offline)"}
           {!projectId && " (No project)"}
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <button 
-            className="text-xs text-[#999999] hover:text-white flex items-center"
+            className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-[#999999] hover:text-white flex items-center`}
             onClick={() => setIsExamplesOpen(!isExamplesOpen)}
           >
-            {isExamplesOpen ? <ChevronDown className="w-3 h-3 mr-1" /> : <ChevronUp className="w-3 h-3 mr-1" />}
-            Examples
+            {isExamplesOpen ? 
+              <ChevronDown className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1`} /> : 
+              <ChevronUp className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1`} />
+            }
+            {isMobile ? '' : 'Examples'}
           </button>
           <button 
-            className="text-xs text-[#FF7A00] hover:text-[#CC6200] flex items-center"
+            className={`${isMobile ? 'text-[10px]' : 'text-xs'} text-[#FF7A00] hover:text-[#CC6200] flex items-center`}
             onClick={() => setIsSuggestionsPanelOpen(!isSuggestionsPanelOpen)}
           >
-            <List className="w-3 h-3 mr-1" />
-            History
+            <List className={`${isMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-1`} />
+            {isMobile ? '' : 'History'}
           </button>
         </div>
       </div>

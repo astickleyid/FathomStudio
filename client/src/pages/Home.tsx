@@ -199,29 +199,31 @@ export default function Home() {
       {/* Mobile Navigation Tabs - Only shown on mobile */}
       {isMobile && (
         <div className="bg-[#121212] border-b border-[#333333]">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger 
-              value="tracks" 
-              className={mobileView === 'tracks' ? 'bg-orange-600' : ''} 
-              onClick={() => setMobileView('tracks')}
-            >
-              Tracks
-            </TabsTrigger>
-            <TabsTrigger 
-              value="timeline" 
-              className={mobileView === 'timeline' ? 'bg-orange-600' : ''} 
-              onClick={() => setMobileView('timeline')}
-            >
-              Timeline
-            </TabsTrigger>
-            <TabsTrigger 
-              value="mixer" 
-              className={mobileView === 'mixer' ? 'bg-orange-600' : ''} 
-              onClick={() => setMobileView('mixer')}
-            >
-              Mixer
-            </TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="timeline">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger 
+                value="tracks" 
+                className={mobileView === 'tracks' ? 'bg-orange-600' : ''} 
+                onClick={() => setMobileView('tracks')}
+              >
+                Tracks
+              </TabsTrigger>
+              <TabsTrigger 
+                value="timeline" 
+                className={mobileView === 'timeline' ? 'bg-orange-600' : ''} 
+                onClick={() => setMobileView('timeline')}
+              >
+                Timeline
+              </TabsTrigger>
+              <TabsTrigger 
+                value="mixer" 
+                className={mobileView === 'mixer' ? 'bg-orange-600' : ''} 
+                onClick={() => setMobileView('mixer')}
+              >
+                Mixer
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       )}
       

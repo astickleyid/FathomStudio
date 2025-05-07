@@ -13,6 +13,7 @@ import { PlusIcon, Mic2Icon, MusicIcon, WavesIcon, Layers3Icon, SettingsIcon } f
 import { apiRequest } from '@/lib/queryClient';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useMobile } from '@/hooks/use-mobile';
 
 interface AddTrackDialogProps {
   projectId: number | undefined | null;
@@ -67,6 +68,7 @@ const TRACK_TYPES: TrackTypeOption[] = [
 export default function AddTrackDialog({ projectId }: AddTrackDialogProps) {
   const [open, setOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const isMobile = useMobile();
   const { toast } = useToast();
 
   const createTrack = async (trackType: string) => {
@@ -132,34 +134,40 @@ export default function AddTrackDialog({ projectId }: AddTrackDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="fixed bottom-20 left-4 rounded-full w-12 h-12 bg-orange-600 hover:bg-orange-700 shadow-lg z-10">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className={`fixed ${isMobile ? 'bottom-28 right-4' : 'bottom-20 left-4'} rounded-full w-12 h-12 bg-orange-600 hover:bg-orange-700 shadow-lg z-10`}
+        >
           <PlusIcon className="h-6 w-6" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={`${isMobile ? 'w-[90%] max-w-[90vw]' : 'sm:max-w-md'}`}>
         <DialogHeader>
           <DialogTitle>Add New Track</DialogTitle>
           <DialogDescription>
             Select the type of track you want to create
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-4 py-4">
+        <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4 py-4`}>
           {TRACK_TYPES.map((trackType) => (
             <Button
               key={trackType.id}
               variant="outline"
-              className="h-auto py-6 px-4 flex flex-col items-center justify-center gap-2 hover:bg-slate-800"
+              className={`h-auto py-4 px-3 flex ${isMobile ? 'flex-row' : 'flex-col'} items-center justify-center gap-3 hover:bg-slate-800`}
               onClick={() => createTrack(trackType.id)}
               disabled={isLoading}
             >
-              <div className="rounded-full p-3" style={{ backgroundColor: `${trackType.color}20` }}>
-                <div className="text-2xl" style={{ color: trackType.color }}>
+              <div className="rounded-full p-2" style={{ backgroundColor: `${trackType.color}20` }}>
+                <div className={`${isMobile ? 'text-xl' : 'text-2xl'}`} style={{ color: trackType.color }}>
                   {trackType.icon}
                 </div>
               </div>
-              <div className="text-center">
+              <div className={`${isMobile ? 'text-left' : 'text-center'} flex-1`}>
                 <div className="font-medium">{trackType.name}</div>
-                <div className="text-xs text-muted-foreground mt-1">{trackType.description}</div>
+                {!isMobile && (
+                  <div className="text-xs text-muted-foreground mt-1">{trackType.description}</div>
+                )}
               </div>
             </Button>
           ))}
