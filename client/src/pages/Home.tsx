@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import MainHeader from '@/components/MainHeader';
@@ -362,7 +362,7 @@ export default function Home() {
               <TabsContent value="mix-bot" className="flex-1 overflow-y-auto px-1">
                 <AutoMixPanel 
                   track={selectedTrack && tracksData ? 
-                    tracksData.find(t => t.id === selectedTrack) || null : null}
+                    tracksData.find((t: Track) => t.id === selectedTrack) || null : null}
                   projectId={currentProject?.id !== undefined ? currentProject.id : null}
                 />
               </TabsContent>

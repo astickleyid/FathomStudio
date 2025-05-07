@@ -21,8 +21,8 @@ import { audioEngine } from '@/lib/audio-engine';
 import { audioStore } from '@/lib/audio-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { Track as AudioTrack } from '@/lib/types';
-import { Track, TrackInsert } from '@shared/schema';
+import { Track } from '@/lib/types';
+import { Track as DbTrack, TrackInsert } from '@shared/schema';
 import { useGestures } from '@/hooks/use-gestures';
 import { useMobile } from '@/hooks/use-mobile';
 import { useWebSocket } from '@/hooks/use-websocket';
@@ -125,13 +125,31 @@ export default function TrackList({
       };
       
       // Send API request to create track
-      const response = await apiRequest<Track>(`/api/projects/${currentProject.id}/tracks`, {
+      const dbResponse = await apiRequest<DbTrack>(`/api/projects/${currentProject.id}/tracks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(trackData),
       });
+      
+      // Convert the database response to frontend Track type
+      const response = {
+        id: dbResponse.id,
+        name: dbResponse.name || 'Untitled Track',
+        type: dbResponse.type || 'audio',
+        color: dbResponse.color || '#FF7A00',
+        isMuted: dbResponse.isMuted === true,
+        isSoloed: dbResponse.isSoloed === true,
+        isArmed: dbResponse.isArmed === true,
+        isAI: dbResponse.isAI === true,
+        projectId: dbResponse.projectId,
+        createdAt: typeof dbResponse.createdAt === 'string' 
+          ? dbResponse.createdAt 
+          : new Date().toISOString(),
+        volume: dbResponse.volume ?? 0,
+        pan: dbResponse.pan ?? 0
+      };
       
       // Update query cache
       queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject.id, 'tracks'] });
@@ -175,7 +193,7 @@ export default function TrackList({
       const newMuteState = !track.isMuted;
       
       // Update track in database
-      await apiRequest<Track>(`/api/tracks/${track.id}`, {
+      await apiRequest<DbTrack>(`/api/tracks/${track.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -224,7 +242,7 @@ export default function TrackList({
       const newArmState = !track.isArmed;
       
       // Update track in database
-      await apiRequest<Track>(`/api/tracks/${track.id}`, {
+      await apiRequest<DbTrack>(`/api/tracks/${track.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
