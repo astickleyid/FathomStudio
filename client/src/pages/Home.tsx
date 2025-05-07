@@ -23,7 +23,7 @@ import { audioEngine } from '@/lib/audio-engine';
 
 export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
-  const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<number | undefined>(undefined);
   const [isConnected, setIsConnected] = useState(false);
   const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   // No longer needed with the new WebSocket hook
@@ -35,7 +35,7 @@ export default function Home() {
   // Get the project ID from the URL
   const [location] = useLocation();
   const projectIdMatch = location.match(/\/project\/(\d+)/);
-  const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : null;
+  const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : undefined;
 
   // Query to get the specific project from the database
   const { data: dbProject, isLoading: isLoadingProjects } = useQuery<DbProject>({
@@ -355,7 +355,7 @@ export default function Home() {
                   tracks={Array.isArray(tracksData) ? tracksData : undefined} 
                   isLoading={isLoadingTracks} 
                   selectedTrackId={selectedTrack}
-                  projectId={currentProject?.id}
+                  projectId={projectId}
                 />
               </TabsContent>
               
@@ -363,13 +363,13 @@ export default function Home() {
                 <AutoMixPanel 
                   track={selectedTrack && tracksData ? 
                     tracksData.find((t: Track) => t.id === selectedTrack) || null : null}
-                  projectId={currentProject?.id !== undefined ? currentProject.id : null}
+                  projectId={projectId}
                 />
               </TabsContent>
               
               <TabsContent value="mastering" className="flex-1 overflow-y-auto px-1">
                 <AutoMasteringPanel 
-                  projectId={currentProject?.id !== undefined ? currentProject.id : null}
+                  projectId={projectId}
                 />
               </TabsContent>
             </Tabs>
@@ -394,7 +394,7 @@ export default function Home() {
             <AICommandInterface 
               onProcessCommand={handleProcessAICommand}
               isConnected={isConnected}
-              projectId={currentProject?.id}
+              projectId={projectId} // Use URL projectId directly
             />
           </div>
         ) : (
@@ -409,7 +409,7 @@ export default function Home() {
       </div>
       
       {/* Add Track Button (Floating) */}
-      <AddTrackDialog projectId={currentProject?.id} />
+      <AddTrackDialog projectId={projectId} />
       
       {/* Footer Status Bar */}
       <StatusFooter 
