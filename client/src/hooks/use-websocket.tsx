@@ -128,7 +128,7 @@ export const useWebSocket = (
 
   // Send a message through the WebSocket
   const sendMessage = useCallback((message: string | ArrayBufferLike | Blob | ArrayBufferView) => {
-    if (socketRef.current && socketRef.current.readyState === ReadyState.OPEN) {
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(message);
       return true;
     }
