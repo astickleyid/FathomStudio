@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Volume2, 
@@ -12,7 +12,8 @@ import {
   MoreVertical,
   MessageSquareText,
   Computer,
-  MoveVertical
+  MoveVertical,
+  FlipHorizontal
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { audioEngine } from '@/lib/audio-engine';
@@ -21,6 +22,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Track as AudioTrack } from '@/lib/types';
 import { Track, TrackInsert } from '@shared/schema';
+import { useGestures } from '@/hooks/use-gestures';
+import { useMobile } from '@/hooks/use-mobile';
 
 interface TrackListProps {
   tracks: Track[] | undefined;
@@ -39,6 +42,11 @@ export default function TrackList({
   const [newTrackName, setNewTrackName] = useState('');
   const [newTrackType, setNewTrackType] = useState('audio');
   const [trackActionsOpen, setTrackActionsOpen] = useState<number | null>(null);
+  const [gestureTrackId, setGestureTrackId] = useState<number | null>(null);
+  const [gestureState, setGestureState] = useState<string | null>(null);
+  const trackListRef = useRef<HTMLDivElement>(null);
+  const trackRefs = useRef<Record<number, HTMLDivElement>>({});
+  const isMobile = useMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -267,6 +275,130 @@ export default function TrackList({
       default:
         return '#CCCCCC';
     }
+  };
+  
+  // Handle track gestures
+  const handleGestureForTrack = (trackId: number) => {
+    // Find the track
+    const track = tracks?.find(t => t.id === trackId);
+    if (!track) return;
+    
+    // Setup gesture handlers
+    const trackRef = trackRefs.current[trackId];
+    if (!trackRef || !isMobile) return;
+    
+    // Use our custom gesture hook
+    useGestures(
+      { current: trackRef },
+      {
+        onSwipeLeft: async () => {
+          setGestureTrackId(trackId);
+          setGestureState('swipe-left');
+          
+          // Mute the track if it's not already muted
+          if (!track.isMuted) {
+            // Use existing function but create a synthetic event
+            await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+            
+            // Show a visual feedback
+            setTimeout(() => {
+              setGestureTrackId(null);
+              setGestureState(null);
+            }, 500);
+            
+            // Show toast notification
+            toast({
+              title: "Track Muted",
+              description: `Track "${track.name}" muted (swipe right to unmute)`,
+              duration: 2000,
+            });
+          }
+        },
+        onSwipeRight: async () => {
+          setGestureTrackId(trackId);
+          setGestureState('swipe-right');
+          
+          // Unmute the track if it's muted
+          if (track.isMuted) {
+            // Use existing function but create a synthetic event
+            await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+            
+            // Show a visual feedback
+            setTimeout(() => {
+              setGestureTrackId(null);
+              setGestureState(null);
+            }, 500);
+            
+            // Show toast notification
+            toast({
+              title: "Track Unmuted",
+              description: `Track "${track.name}" unmuted`,
+              duration: 2000,
+            });
+          }
+        },
+        onSwipeUp: async () => {
+          setGestureTrackId(trackId);
+          setGestureState('swipe-up');
+          
+          // Arm the track if it's not already armed
+          if (!track.isArmed) {
+            // Use existing function but create a synthetic event
+            await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+            
+            // Show a visual feedback
+            setTimeout(() => {
+              setGestureTrackId(null);
+              setGestureState(null);
+            }, 500);
+            
+            // Show toast notification
+            toast({
+              title: "Track Armed",
+              description: `Track "${track.name}" armed for recording (swipe down to disarm)`,
+              duration: 2000,
+            });
+          }
+        },
+        onSwipeDown: async () => {
+          setGestureTrackId(trackId);
+          setGestureState('swipe-down');
+          
+          // Disarm the track if it's armed
+          if (track.isArmed) {
+            // Use existing function but create a synthetic event
+            await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+            
+            // Show a visual feedback
+            setTimeout(() => {
+              setGestureTrackId(null);
+              setGestureState(null);
+            }, 500);
+            
+            // Show toast notification
+            toast({
+              title: "Track Disarmed",
+              description: `Track "${track.name}" disarmed`,
+              duration: 2000,
+            });
+          }
+        },
+        onTap: () => {
+          // Select the track
+          onSelectTrack(trackId);
+        },
+        // Show visual feedback during gestures
+        onGestureStart: () => {
+          setGestureTrackId(trackId);
+        },
+        onGestureEnd: () => {
+          // Only reset if there's no active gesture state
+          if (!gestureState) {
+            setGestureTrackId(null);
+          }
+        }
+      }
+    );
   };
   
   if (isLoading) {
