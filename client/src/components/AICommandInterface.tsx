@@ -172,34 +172,34 @@ export default function AICommandInterface({
       
       {/* AI Suggestions History Panel */}
       {isSuggestionsPanelOpen && (
-        <div className="absolute bottom-full left-0 w-full max-h-[50vh] overflow-y-auto p-4 bg-[#191919] border border-[#333333] rounded-t-lg shadow-lg z-10">
+        <div className={`absolute bottom-full left-0 w-full max-h-[50vh] overflow-y-auto ${isMobile ? 'p-3' : 'p-4'} bg-[#191919] border border-[#333333] rounded-t-lg shadow-lg z-10`}>
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-sm font-medium">Recent AI Suggestions</h3>
+            <h3 className={`${isMobile ? 'text-xs' : 'text-sm'} font-medium`}>Recent AI Suggestions</h3>
             <button 
               onClick={() => setIsSuggestionsPanelOpen(false)}
               className="p-1 hover:bg-[#333333] rounded-full"
             >
-              <X className="w-4 h-4" />
+              <X className={`${isMobile ? 'w-3 h-3' : 'w-4 h-4'}`} />
             </button>
           </div>
           
           {isLoadingSuggestions ? (
-            <div className="py-8 text-center text-[#999999]">
-              <div className="w-8 h-8 border-2 border-[#FF7A00] border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+            <div className={`${isMobile ? 'py-6' : 'py-8'} text-center text-[#999999]`}>
+              <div className={`${isMobile ? 'w-6 h-6' : 'w-8 h-8'} border-2 border-[#FF7A00] border-t-transparent rounded-full animate-spin mx-auto mb-3`}></div>
               Loading suggestions...
             </div>
           ) : recentSuggestions.length > 0 ? (
-            <div className="space-y-4 divide-y divide-[#333333]">
+            <div className={`space-y-${isMobile ? '3' : '4'} divide-y divide-[#333333]`}>
               {recentSuggestions.map((suggestion) => (
-                <div key={suggestion.id} className="pt-3 first:pt-0">
-                  <div className="bg-[#1A1A1A] p-3 rounded-lg">
-                    <p className="text-xs whitespace-pre-line">{suggestion.suggestion}</p>
+                <div key={suggestion.id} className={`${isMobile ? 'pt-2' : 'pt-3'} first:pt-0`}>
+                  <div className={`bg-[#1A1A1A] ${isMobile ? 'p-2' : 'p-3'} rounded-lg`}>
+                    <p className={`${isMobile ? 'text-[10px]' : 'text-xs'} whitespace-pre-line`}>{suggestion.suggestion}</p>
                     <div className="flex justify-between items-center mt-2">
-                      <div className="text-[10px] text-[#777777]">
+                      <div className={`${isMobile ? 'text-[8px]' : 'text-[10px]'} text-[#777777]`}>
                         {new Date(suggestion.createdAt).toLocaleString()}
                       </div>
                       {suggestion.trackId && (
-                        <div className="text-[10px] text-[#FF7A00]">
+                        <div className={`${isMobile ? 'text-[8px]' : 'text-[10px]'} text-[#FF7A00]`}>
                           Track specific
                         </div>
                       )}
@@ -209,7 +209,7 @@ export default function AICommandInterface({
               ))}
             </div>
           ) : (
-            <div className="py-8 text-center text-[#999999]">
+            <div className={`${isMobile ? 'py-6' : 'py-8'} text-center ${isMobile ? 'text-[10px]' : 'text-[#999999]'}`}>
               No suggestions yet. Try asking Fathom AI for help!
             </div>
           )}

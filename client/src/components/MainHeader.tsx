@@ -4,9 +4,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Save, Settings, User, ChevronDown, Home, Plus, 
   FileAudio, Music, Volume2, FileText, X, 
-  Waves, Play, Pause, Download
+  Waves, Play, Pause, Download, Menu
 } from 'lucide-react';
 import { Link } from 'wouter';
+import { useMobile } from '@/hooks/use-mobile';
 
 interface MainHeaderProps {
   project: Project | null;
@@ -16,10 +17,12 @@ interface MainHeaderProps {
 export default function MainHeader({ project, isLoading }: MainHeaderProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [tempo, setTempo] = useState<number>(project?.tempo || 120);
   const [timeSignature, setTimeSignature] = useState<string>(project?.timeSignature || "4/4");
   const [isPlaying, setIsPlaying] = useState(false);
+  const isMobile = useMobile();
   
   // Update tempo and time signature if project changes
   useEffect(() => {
@@ -51,6 +54,131 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
     // Here you would control the actual audio playback
   };
   
+  // Mobile header
+  if (isMobile) {
+    return (
+      <header className="flex items-center justify-between bg-[#121212] p-1.5 border-b border-[#333333] z-20 relative">
+        {/* Left: Logo and Project Name */}
+        <div className="flex items-center">
+          <Link href="/" className="flex items-center">
+            <Waves className="w-5 h-5 text-[#FF7A00]" />
+            <span className="ml-1 text-base font-bold text-white">FATHOM</span>
+          </Link>
+        </div>
+        
+        {/* Center: Project name or transport */}
+        <div className="flex items-center">
+          {isLoading ? (
+            <Skeleton className="h-4 w-20" />
+          ) : (
+            <div className="text-xs font-medium text-white">{project?.name || "Untitled"}</div>
+          )}
+        </div>
+        
+        {/* Right: Mobile menu */}
+        <div className="flex items-center gap-1.5">
+          <button 
+            onClick={handlePlayPause} 
+            className="p-1 bg-[#FF7A00] rounded-full hover:bg-[#CC6200] transition-colors"
+          >
+            {isPlaying ? (
+              <Pause className="w-3 h-3 text-white" />
+            ) : (
+              <Play className="w-3 h-3 text-white" />
+            )}
+          </button>
+          
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-1 bg-[#252525] rounded-full hover:bg-[#333333] transition-colors"
+          >
+            <Menu className="w-4 h-4 text-white" />
+          </button>
+        </div>
+        
+        {/* Mobile Menu Dropdown */}
+        {isMobileMenuOpen && (
+          <div className="absolute top-full right-0 mt-1 w-48 bg-[#1A1A1A] shadow-lg rounded-md border border-[#333333] z-30">
+            <div className="flex justify-between items-center p-2 border-b border-[#333333]">
+              <h3 className="text-xs font-medium">Menu</h3>
+              <button 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-1 hover:bg-[#333333] rounded-full"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="p-2 space-y-1">
+              <button 
+                className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                onClick={handleSave}
+                disabled={isSaving || !project}
+              >
+                <Save className="w-3 h-3 mr-1.5" />
+                {isSaving ? 'Saving...' : 'Save Project'}
+              </button>
+              <Link href="/" 
+                className="flex items-center px-2 py-1.5 text-xs hover:bg-[#252525] rounded-md transition-colors"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Home className="w-3 h-3 mr-1.5" />
+                Project Browser
+              </Link>
+              
+              <hr className="my-1 border-[#333333]" />
+              
+              {!isLoading && (
+                <>
+                  <div className="flex justify-between items-center px-2 py-1.5 text-xs bg-[#252525] rounded-md">
+                    <div className="flex items-center">
+                      <span className="text-[#999999]">Tempo: </span>
+                    </div>
+                    <div className="flex items-center">
+                      <input 
+                        type="number" 
+                        value={tempo} 
+                        onChange={handleTempoChange}
+                        className="w-8 bg-transparent text-[#FF7A00] font-medium text-center text-xs"
+                        min={20}
+                        max={300}
+                      />
+                      <span className="ml-0.5 text-[#999999] text-[10px]">BPM</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center px-2 py-1.5 text-xs">
+                    <span className="text-[#999999]">Time Signature:</span>
+                    <span>{timeSignature}</span>
+                  </div>
+                </>
+              )}
+              
+              <hr className="my-1 border-[#333333]" />
+              
+              <button className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors">
+                <Settings className="w-3 h-3 mr-1.5" />
+                Settings
+              </button>
+              <button className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors text-[#FF7A00]">
+                <Home className="w-3 h-3 mr-1.5" />
+                Exit to Home
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Click away handler for dropdowns */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 z-20" 
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+      </header>
+    );
+  }
+  
+  // Desktop header
   return (
     <header className="flex items-center justify-between bg-[#121212] p-2 border-b border-[#333333] z-20 relative">
       {/* Left Section: Logo and Project Controls */}
