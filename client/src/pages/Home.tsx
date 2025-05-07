@@ -408,8 +408,8 @@ export default function Home() {
         )}
       </div>
       
-      {/* Add Track Button (Floating) */}
-      <AddTrackDialog projectId={projectId} />
+      {/* Add Track Button (Floating - Hidden now since we have a simplified track button) */}
+      {/* <AddTrackDialog projectId={projectId} /> */}
       
       {/* Footer Status Bar */}
       <StatusFooter 

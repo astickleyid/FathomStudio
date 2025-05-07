@@ -658,35 +658,16 @@ export default function TrackList({
             </span>
           )}
           
-          {/* Quick Add Track Buttons */}
-          <div className="flex gap-1">
-            <button 
-              onClick={() => handleCreateTrack('audio')}
-              className="p-1.5 bg-[#5D87FF] hover:bg-[#4A6BCC] rounded-full transition-colors"
-              title="Add Audio Track"
-              disabled={isAddingTrack}
-            >
-              <ListMusic className="w-3.5 h-3.5 text-white" />
-            </button>
-            
-            <button 
-              onClick={() => handleCreateTrack('midi')}
-              className="p-1.5 bg-[#9747FF] hover:bg-[#7939CC] rounded-full transition-colors"
-              title="Add MIDI Track"
-              disabled={isAddingTrack}
-            >
-              <Music className="w-3.5 h-3.5 text-white" />
-            </button>
-            
-            <button 
-              onClick={() => handleCreateTrack('vocal')}
-              className="p-1.5 bg-[#FF7A00] hover:bg-[#CC6200] rounded-full transition-colors"
-              title="Add Vocal Track"
-              disabled={isAddingTrack}
-            >
-              <Mic className="w-3.5 h-3.5 text-white" />
-            </button>
-          </div>
+          {/* Add Track Button */}
+          <button 
+            onClick={() => handleCreateTrack('audio')}
+            className="p-2 bg-[#FF7A00] hover:bg-[#CC6200] rounded-md transition-colors flex items-center gap-1"
+            title="Add New Track"
+            disabled={isAddingTrack}
+          >
+            <Plus className="w-3.5 h-3.5 text-white" />
+            <span className="text-white text-xs font-medium">Add Track</span>
+          </button>
         </div>
       </div>
       
