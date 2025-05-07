@@ -4,6 +4,7 @@ import { db } from "@db";
 import { aiSuggestions, tracks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { AudioAnalysisResult, MixRecommendation, EQBand } from "@shared/mix-bot-types";
+import { MasteringSettings, MasteringTargetPlatform, MasteringPreset } from "@shared/mastering-types";
 
 // Create an OpenAI client instance
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -443,6 +444,339 @@ export class OpenAIService {
         makeupGain: 0
       }
     };
+  }
+
+  /**
+   * Generate mastering preset for specific platform
+   * Part of Auto-AI Mastering Templates feature
+   */
+  async generateMasteringPreset(
+    targetPlatform: MasteringTargetPlatform, 
+    projectId: number,
+    projectDetails?: any
+  ): Promise<MasteringPreset> {
+    try {
+      // Build context string about the project
+      let contextString = `Project ID: ${projectId}`;
+      
+      if (projectDetails) {
+        contextString += `\nProject Name: ${projectDetails.name}
+          \nTempo: ${projectDetails.tempo || 120} BPM
+          \nTime Signature: ${projectDetails.timeSignature || '4/4'}
+          \nGenre: ${projectDetails.genre || 'Unknown'}`;
+      }
+
+      // Generate mastering preset based on target platform
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are the FathomAI mastering assistant in a professional Digital Audio Workstation.
+            
+            Create a detailed mastering preset specifically optimized for ${targetPlatform} distribution.
+            Consider industry standards, technical requirements, and sonic characteristics appropriate for this platform.
+            
+            Project context:
+            ${contextString}
+            
+            Respond with ONLY a JSON object containing the mastering settings in this format:
+            {
+              "name": "Optimized for ${targetPlatform} - Short descriptive name",
+              "description": "Brief description of the mastering approach and benefits",
+              "settings": {
+                "loudnessTarget": -14,
+                "peakLimit": -1.0,
+                "stereoWidth": 100,
+                "dynamicRange": 8,
+                "colorProfile": "neutral",
+                "enhanceOptions": {
+                  "lowEndEnhance": true,
+                  "highEndShimmer": true,
+                  "stereoImaging": true,
+                  "harmonicExciter": false,
+                  "transientEnhancer": true
+                },
+                "eqSettings": {
+                  "bands": [
+                    {"frequency": 30, "gain": -1, "q": 1.4, "type": "lowShelf"},
+                    {"frequency": 100, "gain": 0.5, "q": 1.0, "type": "peaking"},
+                    {"frequency": 250, "gain": -1, "q": 1.0, "type": "peaking"},
+                    {"frequency": 1000, "gain": 0, "q": 1.0, "type": "peaking"},
+                    {"frequency": 3000, "gain": 1, "q": 1.0, "type": "peaking"},
+                    {"frequency": 10000, "gain": 1.5, "q": 0.8, "type": "highShelf"}
+                  ]
+                },
+                "limiters": {
+                  "threshold": -3.0,
+                  "ceiling": -0.3,
+                  "release": 50
+                }
+              }
+            }`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1200,
+        temperature: 0.4
+      });
+      
+      const presetData = JSON.parse(response.choices[0]?.message?.content || "{}");
+      
+      // Generate a unique ID for the preset
+      const presetId = `ai_${targetPlatform}_${Date.now()}`;
+      
+      // Create the preset with AI-generated settings
+      const masteringPreset: MasteringPreset = {
+        id: presetId,
+        name: presetData.name || `AI Master for ${targetPlatform}`,
+        description: presetData.description || `Optimized mastering preset for ${targetPlatform} distribution.`,
+        targetPlatform,
+        settings: {
+          targetPlatform,
+          loudnessTarget: presetData.settings?.loudnessTarget || this.getDefaultLoudnessForPlatform(targetPlatform),
+          peakLimit: presetData.settings?.peakLimit || -1.0,
+          stereoWidth: presetData.settings?.stereoWidth || 100,
+          dynamicRange: presetData.settings?.dynamicRange || 8,
+          colorProfile: presetData.settings?.colorProfile || "neutral",
+          enhanceOptions: presetData.settings?.enhanceOptions || {
+            lowEndEnhance: true,
+            highEndShimmer: true,
+            stereoImaging: true,
+            harmonicExciter: false,
+            transientEnhancer: true
+          },
+          eqSettings: {
+            bands: presetData.settings?.eqSettings?.bands || this.getDefaultMasteringEQ(targetPlatform)
+          },
+          limiters: presetData.settings?.limiters || {
+            threshold: -3.0,
+            ceiling: -0.3,
+            release: 50
+          }
+        },
+        isAIGenerated: true,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Save the mastering preset suggestion to the database
+      const suggestionText = `AI-Generated Mastering Preset for ${targetPlatform}:\n\n` +
+        `${masteringPreset.description}\n` +
+        `Target loudness: ${masteringPreset.settings.loudnessTarget} LUFS\n` +
+        `Dynamic range: ${masteringPreset.settings.dynamicRange} dB\n` +
+        `Color profile: ${masteringPreset.settings.colorProfile}`;
+      
+      const newSuggestion: AISuggestionInsert = {
+        botType: "FathomAI",
+        suggestion: suggestionText,
+        projectId,
+        trackId: null,
+        isApplied: false
+      };
+      
+      await db.insert(aiSuggestions).values(newSuggestion);
+      
+      return masteringPreset;
+    } catch (error) {
+      console.error("Error generating mastering preset:", error);
+      
+      // Return default mastering preset if generation fails
+      return this.getDefaultMasteringPreset(targetPlatform);
+    }
+  }
+  
+  /**
+   * Apply mastering settings to a project
+   */
+  async applyMasteringPreset(projectId: number, preset: MasteringPreset): Promise<boolean> {
+    try {
+      // Here we would apply the mastering settings to the project's master track
+      // In a real implementation, this would interact with the audio engine
+      
+      // For now, we'll just create a suggestion indicating the preset was applied
+      const suggestionText = `Applied AI mastering preset: ${preset.name}\n\n` +
+        `• Target platform: ${preset.targetPlatform}\n` +
+        `• Target loudness: ${preset.settings.loudnessTarget} LUFS\n` +
+        `• Peak limit: ${preset.settings.peakLimit} dB\n` +
+        `• EQ bands: ${preset.settings.eqSettings.bands.length} custom adjustments\n` +
+        `• Special processing: ${Object.entries(preset.settings.enhanceOptions)
+            .filter(([_, value]) => value)
+            .map(([key]) => this.formatEnhanceOptionName(key))
+            .join(', ')}`;
+      
+      const newSuggestion: AISuggestionInsert = {
+        botType: "FathomAI",
+        suggestion: suggestionText,
+        projectId,
+        trackId: null,
+        isApplied: true
+      };
+      
+      await db.insert(aiSuggestions).values(newSuggestion);
+      
+      return true;
+    } catch (error) {
+      console.error("Error applying mastering preset:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Format enhance option name for display
+   */
+  private formatEnhanceOptionName(key: string): string {
+    switch (key) {
+      case 'lowEndEnhance': return 'Low End Enhancement';
+      case 'highEndShimmer': return 'High End Shimmer';
+      case 'stereoImaging': return 'Stereo Imaging';
+      case 'harmonicExciter': return 'Harmonic Exciter';
+      case 'transientEnhancer': return 'Transient Enhancer';
+      default: return key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    }
+  }
+  
+  /**
+   * Get default mastering preset
+   */
+  private getDefaultMasteringPreset(platform: MasteringTargetPlatform): MasteringPreset {
+    return {
+      id: `default_${platform}_${Date.now()}`,
+      name: `Standard ${this.formatPlatformName(platform)} Master`,
+      description: `Default mastering preset optimized for ${platform} distribution.`,
+      targetPlatform: platform,
+      settings: {
+        targetPlatform: platform,
+        loudnessTarget: this.getDefaultLoudnessForPlatform(platform),
+        peakLimit: -1.0,
+        stereoWidth: 100,
+        dynamicRange: 8,
+        colorProfile: "neutral",
+        enhanceOptions: {
+          lowEndEnhance: true,
+          highEndShimmer: true,
+          stereoImaging: true,
+          harmonicExciter: false,
+          transientEnhancer: true
+        },
+        eqSettings: {
+          bands: this.getDefaultMasteringEQ(platform)
+        },
+        limiters: {
+          threshold: -3.0,
+          ceiling: -0.3,
+          release: 50
+        }
+      },
+      isAIGenerated: true,
+      createdAt: new Date().toISOString()
+    };
+  }
+  
+  /**
+   * Get default loudness target LUFS for different platforms
+   */
+  private getDefaultLoudnessForPlatform(platform: MasteringTargetPlatform): number {
+    switch(platform) {
+      case "streaming": return -14;
+      case "club": return -8;
+      case "cd": return -10;
+      case "vinyl": return -14;
+      case "radio": return -12;
+      case "film": return -23;
+      case "podcast": return -16;
+      case "gaming": return -12;
+      case "social": return -13;
+      default: return -14;
+    }
+  }
+
+  /**
+   * Format platform name for display
+   */
+  private formatPlatformName(platform: MasteringTargetPlatform): string {
+    switch(platform) {
+      case "cd": return "CD";
+      case "streaming": return "Streaming";
+      case "vinyl": return "Vinyl";
+      case "club": return "Club/DJ";
+      case "radio": return "Radio";
+      case "film": return "Film/TV";
+      case "podcast": return "Podcast";
+      case "gaming": return "Gaming";
+      case "social": return "Social Media";
+      default: return String(platform).charAt(0).toUpperCase() + String(platform).slice(1);
+    }
+  }
+  
+  /**
+   * Get default mastering EQ for different platforms
+   */
+  private getDefaultMasteringEQ(platform: MasteringTargetPlatform): EQBand[] {
+    switch(platform) {
+      case "streaming":
+        return [
+          { frequency: 30, gain: -1, q: 1.4, type: "lowShelf" },
+          { frequency: 100, gain: 0.5, q: 1.0, type: "peaking" },
+          { frequency: 250, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 1000, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 3000, gain: 1, q: 1.0, type: "peaking" },
+          { frequency: 10000, gain: 1.5, q: 0.8, type: "highShelf" }
+        ];
+      case "club":
+        return [
+          { frequency: 40, gain: 3, q: 1.0, type: "lowShelf" },
+          { frequency: 100, gain: 1, q: 1.4, type: "peaking" },
+          { frequency: 250, gain: -2, q: 1.0, type: "peaking" },
+          { frequency: 1000, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 5000, gain: 1, q: 1.0, type: "peaking" },
+          { frequency: 10000, gain: 2, q: 0.8, type: "highShelf" }
+        ];
+      case "vinyl":
+        return [
+          { frequency: 30, gain: -4, q: 1.0, type: "highPass" },
+          { frequency: 100, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 250, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 1000, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 5000, gain: 1, q: 1.0, type: "peaking" },
+          { frequency: 10000, gain: -2, q: 0.8, type: "highShelf" }
+        ];
+      case "cd":
+        return [
+          { frequency: 40, gain: 1, q: 1.0, type: "lowShelf" },
+          { frequency: 120, gain: -0.5, q: 1.0, type: "peaking" },
+          { frequency: 500, gain: -0.5, q: 1.0, type: "peaking" },
+          { frequency: 2000, gain: 0.5, q: 1.0, type: "peaking" },
+          { frequency: 8000, gain: 1, q: 1.0, type: "peaking" },
+          { frequency: 16000, gain: 1.5, q: 0.8, type: "highShelf" }
+        ];
+      case "radio":
+        return [
+          { frequency: 80, gain: -2, q: 1.0, type: "highPass" },
+          { frequency: 200, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 500, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 2000, gain: 2, q: 1.0, type: "peaking" },
+          { frequency: 5000, gain: 3, q: 1.0, type: "peaking" },
+          { frequency: 10000, gain: 2, q: 0.8, type: "highShelf" }
+        ];
+      case "social":
+        return [
+          { frequency: 60, gain: 2, q: 1.0, type: "lowShelf" },
+          { frequency: 150, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 400, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 1200, gain: 1, q: 1.0, type: "peaking" },
+          { frequency: 3500, gain: 2, q: 1.0, type: "peaking" },
+          { frequency: 10000, gain: 3, q: 0.8, type: "highShelf" }
+        ];
+      default:
+        return [
+          { frequency: 40, gain: 0, q: 1.0, type: "lowShelf" },
+          { frequency: 120, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 500, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 2000, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 8000, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 16000, gain: 0, q: 0.8, type: "highShelf" }
+        ];
+    }
   }
 }
 

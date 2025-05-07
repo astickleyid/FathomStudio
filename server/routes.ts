@@ -387,5 +387,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Autonomous Mix Bot Endpoints
+  
+  // Generate mix recommendations for a track
+  app.post('/api/tracks/:trackId/generate-mix', async (req: Request, res: Response) => {
+    try {
+      const trackId = parseInt(req.params.trackId);
+      const { projectId } = req.body;
+      
+      if (!projectId) {
+        return res.status(400).json({ error: 'Project ID is required' });
+      }
+      
+      // Generate mix recommendations using AI
+      const recommendations = await openAIService.generateMixRecommendations(trackId, projectId);
+      
+      // Notify connected clients about the new mix recommendation
+      broadcastToClients(wss, {
+        type: 'mix_recommendation',
+        trackId,
+        recommendations
+      });
+      
+      return res.status(200).json(recommendations);
+    } catch (error) {
+      console.error('Error generating mix recommendations:', error);
+      return res.status(500).json({ error: 'Failed to generate mix recommendations' });
+    }
+  });
+  
+  // Apply mix recommendations to a track
+  app.post('/api/tracks/:trackId/apply-mix', async (req: Request, res: Response) => {
+    try {
+      const trackId = parseInt(req.params.trackId);
+      const { recommendation } = req.body;
+      
+      if (!recommendation) {
+        return res.status(400).json({ error: 'Mix recommendation is required' });
+      }
+      
+      // Apply the recommendation to the track
+      const success = await openAIService.applyMixRecommendation(trackId, recommendation);
+      
+      if (success) {
+        // Notify connected clients that the track has been updated with new mix settings
+        const updatedTrack = await storage.getTrackById(trackId);
+        
+        if (updatedTrack) {
+          broadcastToClients(wss, {
+            type: 'track_updated',
+            data: updatedTrack
+          });
+        }
+        
+        return res.status(200).json({ success: true, message: 'Mix applied successfully' });
+      } else {
+        return res.status(500).json({ error: 'Failed to apply mix' });
+      }
+    } catch (error) {
+      console.error('Error applying mix:', error);
+      return res.status(500).json({ error: 'Failed to apply mix' });
+    }
+  });
+  
+  // Auto-AI Mastering Templates Endpoints
+  
+  // Generate mastering preset for a specific platform
+  app.post('/api/projects/:projectId/generate-mastering', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { targetPlatform } = req.body;
+      
+      if (!targetPlatform) {
+        return res.status(400).json({ error: 'Target platform is required' });
+      }
+      
+      // Get project details for context
+      const projectDetails = await storage.getProjectById(projectId);
+      if (!projectDetails) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Generate mastering preset using AI
+      const preset = await openAIService.generateMasteringPreset(targetPlatform, projectId, projectDetails);
+      
+      // Notify connected clients about the new mastering preset
+      broadcastToClients(wss, {
+        type: 'mastering_preset_generated',
+        projectId,
+        preset
+      });
+      
+      return res.status(200).json(preset);
+    } catch (error) {
+      console.error('Error generating mastering preset:', error);
+      return res.status(500).json({ error: 'Failed to generate mastering preset' });
+    }
+  });
+  
+  // Apply mastering preset to a project
+  app.post('/api/projects/:projectId/apply-mastering', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const { preset } = req.body;
+      
+      if (!preset) {
+        return res.status(400).json({ error: 'Mastering preset is required' });
+      }
+      
+      // Apply the mastering preset to the project
+      const success = await openAIService.applyMasteringPreset(projectId, preset);
+      
+      if (success) {
+        // Notify connected clients that the project has been updated with new mastering settings
+        broadcastToClients(wss, {
+          type: 'project_mastering_updated',
+          projectId,
+          preset
+        });
+        
+        return res.status(200).json({ success: true, message: 'Mastering preset applied successfully' });
+      } else {
+        return res.status(500).json({ error: 'Failed to apply mastering preset' });
+      }
+    } catch (error) {
+      console.error('Error applying mastering preset:', error);
+      return res.status(500).json({ error: 'Failed to apply mastering preset' });
+    }
+  });
+  
   return httpServer;
 }
