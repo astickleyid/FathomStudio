@@ -18,20 +18,20 @@ export default function Home() {
   const { toast } = useToast();
 
   // Query to get the demo project (default)
-  const { data: projectsData, isLoading: isLoadingProjects } = useQuery({
+  const { data: projectsData, isLoading: isLoadingProjects } = useQuery<Project[]>({
     queryKey: ['/api/projects'],
     enabled: true,
   });
 
   // Once we have projects, select the first one
   useEffect(() => {
-    if (projectsData && projectsData.length > 0) {
+    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0) {
       setCurrentProject(projectsData[0]);
     }
   }, [projectsData]);
 
   // Query to get tracks for the current project
-  const { data: tracksData, isLoading: isLoadingTracks } = useQuery({
+  const { data: tracksData, isLoading: isLoadingTracks } = useQuery<Track[]>({
     queryKey: ['/api/projects', currentProject?.id, 'tracks'],
     enabled: !!currentProject?.id,
   });
@@ -43,6 +43,8 @@ export default function Home() {
       const wsUrl = `${protocol}//${window.location.host}/ws`;
       const newSocket = new WebSocket(wsUrl);
       
+      let pingInterval: NodeJS.Timeout;
+      
       newSocket.onopen = () => {
         console.log('WebSocket connection established');
         setIsConnected(true);
@@ -51,6 +53,15 @@ export default function Home() {
           description: 'Real-time audio collaboration is now active',
           duration: 3000,
         });
+        
+        // Set up a ping interval to keep the connection alive
+        pingInterval = setInterval(() => {
+          if (newSocket.readyState === WebSocket.OPEN) {
+            // Send a ping message every 30 seconds
+            newSocket.send(JSON.stringify({ type: 'ping' }));
+            console.log('Ping sent to server');
+          }
+        }, 30000);
       };
       
       newSocket.onmessage = (event) => {
@@ -82,6 +93,10 @@ export default function Home() {
       newSocket.onclose = () => {
         console.log('WebSocket connection closed');
         setIsConnected(false);
+        // Clear the ping interval
+        if (pingInterval) {
+          clearInterval(pingInterval);
+        }
         // Try to reconnect after a delay
         setTimeout(() => setSocket(null), 5000);
       };
@@ -94,6 +109,9 @@ export default function Home() {
       
       // Clean up on unmount
       return () => {
+        if (pingInterval) {
+          clearInterval(pingInterval);
+        }
         newSocket.close();
       };
     }
@@ -162,7 +180,7 @@ export default function Home() {
         {/* Left Sidebar: Track List and AI Controls */}
         <div className="w-64 bg-[#121212] border-r border-[#333333] flex flex-col">
           <TrackList 
-            tracks={tracksData} 
+            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
             isLoading={isLoadingTracks} 
             selectedTrackId={selectedTrack}
             onSelectTrack={handleTrackSelect}
@@ -177,7 +195,7 @@ export default function Home() {
         {/* Main Content Area with Timeline Editor */}
         <div className="flex-1 flex flex-col bg-[#121212] overflow-hidden">
           <Timeline 
-            tracks={tracksData} 
+            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
             isLoading={isLoadingTracks}
             project={currentProject}
           />
@@ -191,7 +209,7 @@ export default function Home() {
         {/* Right Sidebar: Mixer and Effect Panels */}
         <div className="w-80 bg-[#1A1A1A] border-l border-[#333333] flex flex-col">
           <MixerPanel 
-            tracks={tracksData} 
+            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
             isLoading={isLoadingTracks} 
             selectedTrackId={selectedTrack}
             projectId={currentProject?.id}

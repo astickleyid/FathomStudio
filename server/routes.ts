@@ -1,7 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer } from "ws";
-import WebSocket from "ws";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { z } from "zod";
 import {
@@ -27,7 +26,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const data = JSON.parse(message.toString());
         
         // Handle different message types
-        if (data.type === 'track_update') {
+        if (data.type === 'ping') {
+          // Respond to ping with a pong to keep the connection alive
+          ws.send(JSON.stringify({ type: 'pong' }));
+          console.log('Received ping, sent pong');
+        } else if (data.type === 'track_update') {
           // Broadcast track updates to all clients
           broadcastToClients(wss, {
             type: 'track_update',

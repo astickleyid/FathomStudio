@@ -43,10 +43,10 @@ export default function AICommandInterface({
   };
 
   return (
-    <div className="p-3 border-t border-fathom-lightgray">
+    <div className="p-3 border-t border-[#333333]">
       <form onSubmit={handleSubmit}>
-        <div className="relative ai-command-box p-2 flex items-center">
-          <div className="w-8 h-8 bot-icon mr-2 flex-shrink-0">
+        <div className="relative rounded-3xl bg-gradient-to-b from-[#252525] to-[#1A1A1A] border border-[#333333] transition-all duration-300 p-2 flex items-center">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#FF7A00] to-[#CC6200] rounded-full flex items-center justify-center text-white font-bold shadow-md mr-2 flex-shrink-0">
             {isProcessing ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
@@ -67,12 +67,12 @@ export default function AICommandInterface({
       </form>
       
       <div className="mt-3 flex justify-between">
-        <div className="text-xs text-fathom-text-secondary">
+        <div className="text-xs text-[#999999]">
           Active: {activeBot}
           {!isConnected && " (Offline)"}
         </div>
         <button 
-          className="text-xs text-fathom-orange hover:text-fathom-orange-dark"
+          className="text-xs text-[#FF7A00] hover:text-[#CC6200]"
           onClick={() => {
             if (activeBot === 'MixBot') {
               setActiveBot('MasterBot');
