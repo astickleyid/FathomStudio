@@ -72,7 +72,7 @@ export const useWebSocket = (
         // Set up ping interval to keep connection alive
         if (pingInterval > 0) {
           pingTimeoutRef.current = window.setInterval(() => {
-            if (ws.readyState === ReadyState.OPEN) {
+            if (ws.readyState === WebSocket.OPEN) {
               ws.send(pingMessage);
               console.log('Ping sent');
             }
