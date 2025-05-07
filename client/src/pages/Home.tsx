@@ -6,11 +6,14 @@ import TrackList from '@/components/TrackList';
 import Timeline from '@/components/Timeline';
 import MixerPanel from '@/components/MixerPanel';
 import AICommandInterface from '@/components/AICommandInterface';
+import AutoMixPanel from '@/components/AutoMixPanel';
+import AutoMasteringPanel from '@/components/AutoMasteringPanel';
 import TransportControls from '@/components/TransportControls';
 import StatusFooter from '@/components/StatusFooter';
 import { useToast } from '@/hooks/use-toast';
 import useWebSocket, { ReadyState } from '@/hooks/use-websocket';
 import { Project, Track } from '@shared/schema';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -220,14 +223,39 @@ export default function Home() {
           />
         </div>
         
-        {/* Right Sidebar: Mixer and Effect Panels */}
-        <div className="w-80 bg-[#1A1A1A] border-l border-[#333333] flex flex-col">
-          <MixerPanel 
-            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
-            isLoading={isLoadingTracks} 
-            selectedTrackId={selectedTrack}
-            projectId={currentProject?.id}
-          />
+        {/* Right Sidebar: Mixer and AI Panels */}
+        <div className="w-96 bg-[#1A1A1A] border-l border-[#333333] flex flex-col">
+          <Tabs defaultValue="mixer" className="h-full">
+            <TabsList className="w-full grid grid-cols-3 mb-2">
+              <TabsTrigger value="mixer">Mixer</TabsTrigger>
+              <TabsTrigger value="mix-bot">Mix Bot</TabsTrigger>
+              <TabsTrigger value="mastering">Mastering</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="mixer" className="flex-1 overflow-y-auto px-1">
+              <MixerPanel 
+                tracks={Array.isArray(tracksData) ? tracksData : undefined} 
+                isLoading={isLoadingTracks} 
+                selectedTrackId={selectedTrack}
+                projectId={currentProject?.id}
+              />
+            </TabsContent>
+            
+            <TabsContent value="mix-bot" className="flex-1 overflow-y-auto px-1">
+              {/* Find the selected track from tracks array */}
+              <AutoMixPanel 
+                track={selectedTrack && tracksData ? 
+                  tracksData.find(t => t.id === selectedTrack) || null : null}
+                projectId={currentProject?.id !== undefined ? currentProject.id : null}
+              />
+            </TabsContent>
+            
+            <TabsContent value="mastering" className="flex-1 overflow-y-auto px-1">
+              <AutoMasteringPanel 
+                projectId={currentProject?.id !== undefined ? currentProject.id : null}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
       

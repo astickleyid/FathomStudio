@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { AudioAnalysisResult, MixRecommendation, EQBand } from "@shared/mix-bot-types";
 import { apiRequest } from '@/lib/queryClient';
 import { Loader2, ZapIcon, SlidersHorizontal, WavesIcon, BarChart2 } from 'lucide-react';
-import { Track } from '@/lib/types';
+import { Track } from '@shared/schema';
 import { useToast } from '@/hooks/use-toast';
 
 interface AutoMixPanelProps {
