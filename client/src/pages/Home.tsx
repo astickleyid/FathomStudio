@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import MainHeader from '@/components/MainHeader';
 import TrackList from '@/components/TrackList';
 import Timeline from '@/components/Timeline';
@@ -18,18 +19,22 @@ export default function Home() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const { toast } = useToast();
 
-  // Query to get the demo project (default)
-  const { data: projectsData, isLoading: isLoadingProjects } = useQuery<Project[]>({
-    queryKey: ['/api/projects'],
-    enabled: true,
+  // Get the project ID from the URL
+  const [, params] = useLocation();
+  const projectId = params ? parseInt(params.id) : null;
+
+  // Query to get the specific project
+  const { data: project, isLoading: isLoadingProjects } = useQuery<Project>({
+    queryKey: ['/api/projects', projectId],
+    enabled: !!projectId,
   });
 
-  // Once we have projects, select the first one
+  // Once we have the project, set it as current
   useEffect(() => {
-    if (projectsData && Array.isArray(projectsData) && projectsData.length > 0) {
-      setCurrentProject(projectsData[0]);
+    if (project) {
+      setCurrentProject(project);
     }
-  }, [projectsData]);
+  }, [project]);
 
   // Query to get tracks for the current project
   const { data: tracksData, isLoading: isLoadingTracks } = useQuery<Track[]>({
