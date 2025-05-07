@@ -13,6 +13,7 @@ import StatusFooter from '@/components/StatusFooter';
 import AddTrackDialog from '@/components/AddTrackDialog';
 import { useToast } from '@/hooks/use-toast';
 import useWebSocket, { ReadyState } from '@/hooks/use-websocket';
+import { useMobile } from '@/hooks/use-mobile';
 import { Project, Track } from '@shared/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -21,6 +22,8 @@ export default function Home() {
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [mobileView, setMobileView] = useState<'tracks' | 'timeline' | 'mixer'>('timeline');
+  const isMobile = useMobile();
   const { toast } = useToast();
 
   // Get the project ID from the URL
@@ -193,69 +196,104 @@ export default function Home() {
         isLoading={isLoadingProjects}
       />
       
+      {/* Mobile Navigation Tabs - Only shown on mobile */}
+      {isMobile && (
+        <div className="bg-[#121212] border-b border-[#333333]">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger 
+              value="tracks" 
+              className={mobileView === 'tracks' ? 'bg-orange-600' : ''} 
+              onClick={() => setMobileView('tracks')}
+            >
+              Tracks
+            </TabsTrigger>
+            <TabsTrigger 
+              value="timeline" 
+              className={mobileView === 'timeline' ? 'bg-orange-600' : ''} 
+              onClick={() => setMobileView('timeline')}
+            >
+              Timeline
+            </TabsTrigger>
+            <TabsTrigger 
+              value="mixer" 
+              className={mobileView === 'mixer' ? 'bg-orange-600' : ''} 
+              onClick={() => setMobileView('mixer')}
+            >
+              Mixer
+            </TabsTrigger>
+          </TabsList>
+        </div>
+      )}
+      
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: Track List */}
-        <div className="w-64 bg-[#121212] border-r border-[#333333] flex flex-col">
-          <TrackList 
-            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
-            isLoading={isLoadingTracks} 
-            selectedTrackId={selectedTrack}
-            onSelectTrack={handleTrackSelect}
-          />
-        </div>
+        {/* Left Sidebar: Track List - Hidden on mobile unless selected */}
+        {(!isMobile || (isMobile && mobileView === 'tracks')) && (
+          <div className={`${isMobile ? 'w-full' : 'w-64'} bg-[#121212] border-r border-[#333333] flex flex-col`}>
+            <TrackList 
+              tracks={Array.isArray(tracksData) ? tracksData : undefined} 
+              isLoading={isLoadingTracks} 
+              selectedTrackId={selectedTrack}
+              onSelectTrack={handleTrackSelect}
+            />
+          </div>
+        )}
         
-        {/* Main Content Area with Timeline Editor */}
-        <div className="flex-1 flex flex-col bg-[#121212] overflow-hidden">
-          <Timeline 
-            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
-            isLoading={isLoadingTracks}
-            project={currentProject}
-          />
-          
-          <TransportControls 
-            tempo={currentProject?.tempo || 120}
-            socket={socket}
-          />
-        </div>
+        {/* Main Content Area with Timeline Editor - Hidden on mobile unless selected */}
+        {(!isMobile || (isMobile && mobileView === 'timeline')) && (
+          <div className={`${isMobile ? 'w-full' : 'flex-1'} flex flex-col bg-[#121212] overflow-hidden`}>
+            <Timeline 
+              tracks={Array.isArray(tracksData) ? tracksData : undefined} 
+              isLoading={isLoadingTracks}
+              project={currentProject}
+            />
+            
+            <TransportControls 
+              tempo={currentProject?.tempo || 120}
+              socket={socket}
+            />
+          </div>
+        )}
         
-        {/* Right Sidebar: Mixer and AI Panels */}
-        <div className="w-96 bg-[#1A1A1A] border-l border-[#333333] flex flex-col">
-          <Tabs defaultValue="mixer" className="h-full">
-            <TabsList className="w-full grid grid-cols-3 mb-2">
-              <TabsTrigger value="mixer">Mixer</TabsTrigger>
-              <TabsTrigger value="mix-bot">Mix Bot</TabsTrigger>
-              <TabsTrigger value="mastering">Mastering</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="mixer" className="flex-1 overflow-y-auto px-1">
-              <MixerPanel 
-                tracks={Array.isArray(tracksData) ? tracksData : undefined} 
-                isLoading={isLoadingTracks} 
-                selectedTrackId={selectedTrack}
-                projectId={currentProject?.id}
-              />
-            </TabsContent>
-            
-            <TabsContent value="mix-bot" className="flex-1 overflow-y-auto px-1">
-              <AutoMixPanel 
-                track={selectedTrack && tracksData ? 
-                  tracksData.find(t => t.id === selectedTrack) || null : null}
-                projectId={currentProject?.id !== undefined ? currentProject.id : null}
-              />
-            </TabsContent>
-            
-            <TabsContent value="mastering" className="flex-1 overflow-y-auto px-1">
-              <AutoMasteringPanel 
-                projectId={currentProject?.id !== undefined ? currentProject.id : null}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
+        {/* Right Sidebar: Mixer and AI Panels - Hidden on mobile unless selected */}
+        {(!isMobile || (isMobile && mobileView === 'mixer')) && (
+          <div className={`${isMobile ? 'w-full' : 'w-96'} bg-[#1A1A1A] border-l border-[#333333] flex flex-col`}>
+            <Tabs defaultValue="mixer" className="h-full">
+              <TabsList className="w-full grid grid-cols-3 mb-2">
+                <TabsTrigger value="mixer">Mixer</TabsTrigger>
+                <TabsTrigger value="mix-bot">Mix Bot</TabsTrigger>
+                <TabsTrigger value="mastering">Mastering</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="mixer" className="flex-1 overflow-y-auto px-1">
+                <MixerPanel 
+                  tracks={Array.isArray(tracksData) ? tracksData : undefined} 
+                  isLoading={isLoadingTracks} 
+                  selectedTrackId={selectedTrack}
+                  projectId={currentProject?.id}
+                />
+              </TabsContent>
+              
+              <TabsContent value="mix-bot" className="flex-1 overflow-y-auto px-1">
+                <AutoMixPanel 
+                  track={selectedTrack && tracksData ? 
+                    tracksData.find(t => t.id === selectedTrack) || null : null}
+                  projectId={currentProject?.id !== undefined ? currentProject.id : null}
+                />
+              </TabsContent>
+              
+              <TabsContent value="mastering" className="flex-1 overflow-y-auto px-1">
+                <AutoMasteringPanel 
+                  projectId={currentProject?.id !== undefined ? currentProject.id : null}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
       </div>
       
       {/* Fixed AI Command Interface */}
-      <div className="fixed bottom-28 left-1/2 transform -translate-x-1/2 w-96 z-50">
+      <div className={`fixed bottom-28 left-1/2 transform -translate-x-1/2 ${isMobile ? 'w-[90%]' : 'w-96'} z-50`}>
         <div className="bg-[#1A1A1A] border border-[#333333] rounded-md shadow-xl">
           <div className="flex items-center justify-between px-3 py-1.5 bg-[#252525] border-b border-[#333333]">
             <h3 className="text-sm font-medium">AI Assistant</h3>
