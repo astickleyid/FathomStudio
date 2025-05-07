@@ -13,13 +13,16 @@ import {
 import { audioEngine } from '@/lib/audio-engine';
 import { audioStore } from '@/lib/audio-store';
 import { useToast } from '@/hooks/use-toast';
+import { useWebSocket } from '@/hooks/use-websocket';
 
 interface TransportControlsProps {
   tempo: number;
-  socket: WebSocket | null;
+  socket?: WebSocket | null; // Make socket optional as we'll use the WebSocket hook
 }
 
-export default function TransportControls({ tempo, socket }: TransportControlsProps) {
+export default function TransportControls({ tempo }: TransportControlsProps) {
+  // Use our WebSocket hook
+  const { isConnected, sendMessage } = useWebSocket();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
@@ -131,12 +134,15 @@ export default function TransportControls({ tempo, socket }: TransportControlsPr
     audioStore.getState().setPlaying(newPlayingState);
     
     // Send transport control message via WebSocket if connected
-    if (socket && socket.readyState === 1) {
-      socket.send(JSON.stringify({
+    if (isConnected) {
+      sendMessage({
         type: 'transport_control',
-        action: newPlayingState ? 'play' : 'stop',
-        position: audioEngine.getPosition() // Current playback position in seconds
-      }));
+        message: newPlayingState ? 'play' : 'stop',
+        data: {
+          action: newPlayingState ? 'play' : 'stop',
+          position: audioEngine.getPosition() // Current playback position in seconds
+        }
+      });
     }
   };
   
@@ -156,12 +162,15 @@ export default function TransportControls({ tempo, socket }: TransportControlsPr
       setCurrentTime('00:00.00');
       
       // Send stop message via WebSocket if connected
-      if (socket && socket.readyState === 1) {
-        socket.send(JSON.stringify({
+      if (isConnected) {
+        sendMessage({
           type: 'transport_control',
-          action: 'stop',
-          position: 0
-        }));
+          message: 'stop',
+          data: {
+            action: 'stop',
+            position: 0
+          }
+        });
       }
     }
   };
@@ -187,12 +196,15 @@ export default function TransportControls({ tempo, socket }: TransportControlsPr
     audioStore.getState().setRecording(newRecordingState);
     
     // Send transport control message via WebSocket if connected
-    if (socket && socket.readyState === 1) {
-      socket.send(JSON.stringify({
+    if (isConnected) {
+      sendMessage({
         type: 'transport_control',
-        action: newRecordingState ? 'record' : 'stop_record',
-        position: audioEngine.getPosition()
-      }));
+        message: newRecordingState ? 'record' : 'stop_record',
+        data: {
+          action: newRecordingState ? 'record' : 'stop_record',
+          position: audioEngine.getPosition()
+        }
+      });
     }
     
     // Show toast notification
