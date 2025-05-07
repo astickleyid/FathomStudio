@@ -42,6 +42,26 @@ export interface Track {
   pan?: number;
 }
 
+// Helper function to convert database track to frontend type
+export function adaptTrackToFrontendType(dbTrack: any): Track {
+  return {
+    id: dbTrack.id,
+    name: dbTrack.name || 'Untitled Track',
+    type: dbTrack.type || 'audio',
+    color: dbTrack.color || '#FF7A00',
+    isMuted: dbTrack.isMuted === true,
+    isSoloed: dbTrack.isSoloed === true,
+    isArmed: dbTrack.isArmed === true,
+    isAI: dbTrack.isAI === true,
+    projectId: dbTrack.projectId,
+    createdAt: typeof dbTrack.createdAt === 'string' 
+      ? dbTrack.createdAt 
+      : new Date().toISOString(),
+    volume: dbTrack.volume ?? 0, // Default if null
+    pan: dbTrack.pan ?? 0 // Default if null
+  };
+}
+
 // Clip type for frontend use
 export interface Clip {
   id: number;

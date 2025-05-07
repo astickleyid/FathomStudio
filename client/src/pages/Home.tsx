@@ -16,9 +16,10 @@ import { useWebSocket } from '@/hooks/use-websocket';
 import { useMobile } from '@/hooks/use-mobile';
 import { audioStore } from '@/lib/audio-store';
 import { Project as DbProject, Track as DbTrack } from '@shared/schema';
-import { Project, Track, adaptProjectToFrontendType } from '@/lib/types';
+import { Project, Track, adaptProjectToFrontendType, adaptTrackToFrontendType } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, Sparkles } from 'lucide-react';
+import { audioEngine } from '@/lib/audio-engine';
 
 export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -36,52 +37,45 @@ export default function Home() {
   const projectIdMatch = location.match(/\/project\/(\d+)/);
   const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : null;
 
-  // Query to get the specific project
-  const { data: project, isLoading: isLoadingProjects } = useQuery<Project>({
+  // Query to get the specific project from the database
+  const { data: dbProject, isLoading: isLoadingProjects } = useQuery<DbProject>({
     queryKey: ['/api/projects', projectId],
     enabled: !!projectId,
   });
+  
+  // Convert database project to frontend project
+  const project = dbProject ? adaptProjectToFrontendType(dbProject) : null;
 
-  // Helper function to adapt database project to frontend Project type
-  const adaptProjectToFrontendType = (dbProject: any): Project => {
-    return {
-      id: dbProject.id,
-      name: dbProject.name,
-      tempo: dbProject.tempo ?? 120, // Use nullish coalescing to handle null
-      timeSignature: dbProject.timeSignature ?? '4/4',
-      sampleRate: dbProject.sampleRate ?? 44100,
-      createdAt: typeof dbProject.createdAt === 'string' 
-        ? dbProject.createdAt 
-        : dbProject.createdAt instanceof Date 
-          ? dbProject.createdAt.toISOString() 
-          : new Date().toISOString(),
-      updatedAt: typeof dbProject.updatedAt === 'string' 
-        ? dbProject.updatedAt 
-        : dbProject.updatedAt instanceof Date 
-          ? dbProject.updatedAt.toISOString() 
-          : new Date().toISOString()
-    };
-  };
+  // Initialize audio engine
+  useEffect(() => {
+    // Only initialize the audio engine once
+    if (!audioEngine.isEngineInitialized()) {
+      // Try to initialize the audio engine
+      try {
+        audioEngine.initialize().then(() => {
+          console.log('Audio engine initialized successfully');
+        }).catch(error => {
+          console.error('Error initializing audio engine:', error);
+          toast({
+            title: 'Audio Error',
+            description: 'Could not initialize audio engine. Click anywhere on the page to enable audio.',
+            variant: 'destructive',
+            duration: 5000,
+          });
+        });
+      } catch (error) {
+        console.error('Failed to initialize audio engine:', error);
+      }
+    }
+  }, [toast]);
 
   // Once we have the project, set it as current
   useEffect(() => {
     if (project) {
       console.log('Original project from API:', project);
       
-      // Use type assertion to fix TypeScript issues
-      const typeSafeProject: Project = {
-        id: project.id,
-        name: project.name,
-        tempo: project.tempo ?? 120,
-        timeSignature: project.timeSignature ?? '4/4',
-        sampleRate: project.sampleRate ?? 44100,
-        createdAt: typeof project.createdAt === 'string' 
-          ? project.createdAt 
-          : new Date().toISOString(),
-        updatedAt: typeof project.updatedAt === 'string' 
-          ? project.updatedAt 
-          : new Date().toISOString()
-      };
+      // Convert the project from API to frontend type
+      const typeSafeProject = adaptProjectToFrontendType(project);
       
       // Update local state
       setCurrentProject(typeSafeProject);
@@ -94,14 +88,37 @@ export default function Home() {
       setIsAIAssistantOpen(true);
       
       console.log('Project set in audioStore:', typeSafeProject.id, typeSafeProject.name);
+      
+      // Make sure the audio engine is initialized
+      if (!audioEngine.isEngineInitialized()) {
+        toast({
+          title: 'Audio Engine',
+          description: 'Initializing audio engine. Click anywhere on the page if audio doesn\'t work.',
+          duration: 3000,
+        });
+        
+        try {
+          audioEngine.initialize().catch(error => {
+            console.error('Failed to initialize audio engine:', error);
+          });
+        } catch (error) {
+          console.error('Error initializing audio engine:', error);
+        }
+      }
     }
-  }, [project]);
+  }, [project, toast]);
 
-  // Query to get tracks for the current project
-  const { data: tracksData, isLoading: isLoadingTracks } = useQuery<Track[]>({
+  // Query to get tracks for the current project from the database
+  const { data: dbTracksData, isLoading: isLoadingTracks } = useQuery<DbTrack[]>({
     queryKey: ['/api/projects', currentProject?.id, 'tracks'],
     enabled: !!currentProject?.id,
   });
+  
+  // Convert database tracks to frontend tracks
+  const tracksData = useMemo(() => {
+    if (!dbTracksData) return undefined;
+    return dbTracksData.map(track => adaptTrackToFrontendType(track));
+  }, [dbTracksData]);
 
   // Helper function to handle WebSocket messages
   const handleWebSocketMessage = useCallback((event: WebSocketEventMap['message']) => {

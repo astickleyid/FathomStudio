@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { 
   FolderOpen, 
@@ -25,7 +25,8 @@ import {
   X
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Project } from '@shared/schema';
+import { Project as DbProject } from '@shared/schema';
+import { Project, adaptProjectToFrontendType } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { apiRequest } from '@/lib/queryClient';
@@ -52,10 +53,17 @@ export default function StartPage() {
   const queryClient = useQueryClient();
 
   // Get recent projects
-  const { data: recentProjects, isLoading: isLoadingProjects } = useQuery<Project[]>({
+  const { data: rawProjects, isLoading: isLoadingProjects } = useQuery<DbProject[]>({
     queryKey: ['/api/projects'],
     enabled: true,
   });
+  
+  // Convert database projects to frontend projects
+  // Using simple variable approach instead of useMemo to avoid potential issues
+  let recentProjects: Project[] | undefined = undefined;
+  if (rawProjects) {
+    recentProjects = rawProjects.map(project => adaptProjectToFrontendType(project));
+  }
 
   // Create project mutation
   const createProjectMutation = useMutation({
