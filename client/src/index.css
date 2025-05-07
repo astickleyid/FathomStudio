@@ -1,0 +1,245 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 7%;
+    --foreground: 0 0% 100%;
+    
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 100%;
+    
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 100%;
+    
+    --primary: 28 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 0 0% 15%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 60%;
+    
+    --accent: 187 100% 45%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 0 0% 20%;
+    --input: 0 0% 15%;
+    --ring: 28 100% 50%;
+    
+    --radius: 0.5rem;
+    
+    /* Custom theme colors for Fathom Studio */
+    --fathom-black: 0 0% 7%;
+    --fathom-darkgray: 0 0% 10%;
+    --fathom-gray: 0 0% 15%;
+    --fathom-lightgray: 0 0% 20%;
+    --fathom-orange: 28 100% 50%;
+    --fathom-orange-dark: 28 100% 40%;
+    --fathom-teal: 174 100% 45%;
+    --fathom-purple: 272 100% 65%;
+    --fathom-blue: 217 100% 62%;
+    --fathom-text: 0 0% 100%;
+    --fathom-text-secondary: 0 0% 60%;
+  }
+  
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+    @apply bg-background text-foreground antialiased;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+      
+  ::-webkit-scrollbar-track {
+    @apply bg-[#1A1A1A];
+  }
+      
+  ::-webkit-scrollbar-thumb {
+    @apply bg-[#333333] rounded;
+  }
+      
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-[#252525];
+  }
+}
+
+@layer components {
+  /* Knob component */
+  .knob {
+    @apply relative w-[60px] h-[60px];
+  }
+    
+  .knob-circle {
+    @apply w-full h-full rounded-full bg-gradient-to-br from-[#1A1A1A] to-[#252525]
+           shadow-md flex items-center justify-center relative;
+  }
+    
+  .knob-indicator {
+    @apply absolute w-[2px] h-[40%] bottom-1/2 left-1/2 origin-bottom 
+           transform -translate-x-1/2 rotate-0;
+  }
+    
+  .knob-glow {
+    @apply absolute w-full h-full rounded-full opacity-70 z-0;
+  }
+  
+  /* Waveform */
+  .waveform {
+    @apply relative rounded overflow-hidden;
+  }
+  
+  /* Fader */
+  .fader {
+    @apply relative w-3 h-[120px] bg-gradient-to-b from-[#333333] to-[#1A1A1A]
+           rounded-md mx-auto;
+  }
+    
+  .fader-handle {
+    @apply absolute w-6 h-3 bg-gradient-to-b from-[#252525] to-[#333333]
+           rounded-sm left-1/2 transform -translate-x-1/2 shadow-md;
+  }
+  
+  /* Channel strip */
+  .channel-strip {
+    @apply rounded-lg bg-gradient-to-b from-[#252525] to-[#1A1A1A] p-3 shadow-md;
+  }
+  
+  /* AI command box */
+  .ai-command-box {
+    @apply rounded-3xl bg-gradient-to-b from-[#252525] to-[#1A1A1A]
+           border border-[#333333] transition-all duration-300;
+  }
+    
+  .ai-command-box:focus-within {
+    @apply border-[#FF7A00] shadow-[0_0_0_1px_rgba(255,122,0,0.3)];
+  }
+  
+  /* Bot icon */
+  .bot-icon {
+    @apply bg-gradient-to-br from-[#FF7A00] to-[#CC6200]
+           rounded-full flex items-center justify-center text-white font-bold
+           shadow-md;
+  }
+  
+  /* Transport control */
+  .transport-control {
+    @apply w-10 h-10 rounded-full flex items-center justify-center
+           bg-gradient-to-br from-[#252525] to-[#1A1A1A]
+           shadow-md cursor-pointer transition-all duration-200;
+  }
+    
+  .transport-control:hover {
+    @apply bg-gradient-to-br from-[#333333] to-[#252525] transform scale-105;
+  }
+    
+  .transport-control.active {
+    @apply bg-gradient-to-br from-[#FF7A00] to-[#CC6200];
+  }
+  
+  /* Plugin module */
+  .plugin-module {
+    @apply rounded-xl bg-gradient-to-br from-[#1A1A1A] to-[#252525]
+           shadow-md overflow-hidden;
+  }
+  
+  /* EQ curve */
+  .eq-curve {
+    @apply relative h-[120px];
+  }
+    
+  .eq-point {
+    @apply absolute w-3 h-3 rounded-full transform -translate-x-1/2 -translate-y-1/2
+           cursor-pointer shadow-md z-10;
+  }
+    
+  .eq-line {
+    @apply absolute top-0 left-0 w-full h-full fill-none stroke-2;
+  }
+}
+
+@layer utilities {
+  .text-fathom-orange {
+    @apply text-[#FF7A00];
+  }
+  
+  .text-fathom-orange-dark {
+    @apply text-[#CC6200];
+  }
+  
+  .text-fathom-teal {
+    @apply text-[#00E5CC];
+  }
+  
+  .text-fathom-purple {
+    @apply text-[#A64AFF];
+  }
+  
+  .text-fathom-blue {
+    @apply text-[#3F8CFF];
+  }
+  
+  .text-fathom-text {
+    @apply text-white;
+  }
+  
+  .text-fathom-text-secondary {
+    @apply text-[#999999];
+  }
+  
+  .bg-fathom-black {
+    @apply bg-[#121212];
+  }
+  
+  .bg-fathom-darkgray {
+    @apply bg-[#1A1A1A];
+  }
+  
+  .bg-fathom-gray {
+    @apply bg-[#252525];
+  }
+  
+  .bg-fathom-lightgray {
+    @apply bg-[#333333];
+  }
+  
+  .bg-fathom-orange {
+    @apply bg-[#FF7A00];
+  }
+  
+  .bg-fathom-orange-dark {
+    @apply bg-[#CC6200];
+  }
+  
+  .bg-fathom-teal {
+    @apply bg-[#00E5CC];
+  }
+  
+  .bg-fathom-purple {
+    @apply bg-[#A64AFF];
+  }
+  
+  .bg-fathom-blue {
+    @apply bg-[#3F8CFF];
+  }
+  
+  .border-fathom-lightgray {
+    @apply border-[#333333];
+  }
+  
+  .border-fathom-orange {
+    @apply border-[#FF7A00];
+  }
+}
