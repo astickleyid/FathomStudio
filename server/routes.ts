@@ -217,7 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isSoloed: originalTrack.isSoloed,
         isArmed: originalTrack.isArmed,
         isAI: originalTrack.isAI,
-        position: originalTrack.position, 
+        volume: originalTrack.volume,
+        pan: originalTrack.pan
       };
       
       const newTrack = await storage.createTrack(duplicateData);
@@ -231,9 +232,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             name: clip.name,
             startTime: clip.startTime,
             duration: clip.duration,
-            audioUrl: clip.audioUrl,
-            waveformData: clip.waveformData,
-            color: clip.color
+            audioData: clip.audioData,
+            waveformData: JSON.stringify([])
           });
         }
       }

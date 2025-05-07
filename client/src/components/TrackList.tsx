@@ -421,14 +421,52 @@ export default function TrackList({
                       <div className="absolute right-0 top-full mt-1 w-40 bg-[#1A1A1A] shadow-lg rounded-md border border-[#333333] z-10">
                         <button 
                           className="w-full flex items-center p-2 text-xs hover:bg-[#252525] text-left"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            // Duplicate track functionality
-                            toast({
-                              title: "Feature coming soon",
-                              description: "Duplicate track feature will be available in the next update",
-                            });
                             setTrackActionsOpen(null);
+                            
+                            try {
+                              // Show loading toast
+                              toast({
+                                title: "Duplicating track",
+                                description: `Creating a copy of "${track.name}"`,
+                              });
+                              
+                              // Call the duplicate endpoint
+                              const duplicatedTrack = await apiRequest<Track>(`/api/tracks/${track.id}/duplicate`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                }
+                              });
+                              
+                              // Update the track list
+                              queryClient.invalidateQueries({ 
+                                queryKey: ['/api/projects', track.projectId, 'tracks'] 
+                              });
+                              
+                              // Create track in audio engine
+                              if (audioEngine.isEngineInitialized()) {
+                                audioEngine.createTrack(duplicatedTrack);
+                              }
+                              
+                              // Show success message
+                              toast({
+                                title: "Track duplicated",
+                                description: `Created "${duplicatedTrack.name}"`,
+                              });
+                              
+                              // Select the new track
+                              onSelectTrack(duplicatedTrack.id);
+                              
+                            } catch (error) {
+                              console.error("Error duplicating track:", error);
+                              toast({
+                                title: "Failed to duplicate track",
+                                description: "There was an error duplicating the track. Please try again.",
+                                variant: "destructive",
+                              });
+                            }
                           }}
                         >
                           <Copy className="w-3.5 h-3.5 mr-2" />
