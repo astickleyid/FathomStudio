@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import { openAIService } from "./openai-service";
+import { aiSoundService } from "./ai-sound-service";
 import { z } from "zod";
 import {
   trackInsertSchema,
