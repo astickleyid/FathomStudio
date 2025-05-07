@@ -110,8 +110,8 @@ export default function Home() {
 
   // Query to get tracks for the current project from the database
   const { data: dbTracksData, isLoading: isLoadingTracks } = useQuery<DbTrack[]>({
-    queryKey: ['/api/projects', currentProject?.id, 'tracks'],
-    enabled: !!currentProject?.id,
+    queryKey: ['/api/projects', projectId, 'tracks'],
+    enabled: !!projectId, // Use projectId from URL directly, not from currentProject
   });
   
   // Convert database tracks to frontend tracks
@@ -218,7 +218,7 @@ export default function Home() {
         message: command,
         data: {
           command: command,
-          projectId: currentProject?.id,
+          projectId: projectId, // Use URL projectId directly 
           trackId: selectedTrack
         }
       });
@@ -232,7 +232,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           command,
-          projectId: currentProject?.id,
+          projectId: projectId, // Use URL projectId directly
           trackId: selectedTrack
         }),
       });

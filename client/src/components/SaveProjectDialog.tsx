@@ -22,12 +22,15 @@ export default function SaveProjectDialog({ open, onOpenChange, project, action 
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // Set project name when project changes
+  // Set project name when project changes or dialog opens
   useEffect(() => {
-    if (project && action === 'save') {
-      setProjectName(project.name);
+    if (project && (action === 'save' || action === 'save-as')) {
+      setProjectName(project.name || '');
+    } else if (action === 'new') {
+      setProjectName('');
     }
-  }, [project, action]);
+    // Only run this when open or project/action actually changes
+  }, [open, project?.id, action]);
 
   // Fetch projects for "open" dialog
   useEffect(() => {
