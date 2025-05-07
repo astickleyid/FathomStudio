@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { AudioAnalysisResult, MixRecommendation, EQBand } from "@shared/mix-bot-types";
 import { apiRequest } from '@/lib/queryClient';
-import { Loader2, ZapIcon, SlidersHorizontal, WaveformIcon, BarChart2 } from 'lucide-react';
+import { Loader2, ZapIcon, SlidersHorizontal, WavesIcon, BarChart2 } from 'lucide-react';
 import { Track } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -163,7 +163,7 @@ export default function AutoMixPanel({ track, projectId, onMixApplied }: AutoMix
                   <span>Gain</span>
                 </TabsTrigger>
                 <TabsTrigger value="eq" className="flex items-center gap-1">
-                  <Waveform size={14} />
+                  <WavesIcon size={14} />
                   <span>EQ</span>
                 </TabsTrigger>
                 <TabsTrigger value="comp" className="flex items-center gap-1">
