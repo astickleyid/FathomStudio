@@ -1,6 +1,7 @@
 import * as Tone from 'tone';
 import { audioStore } from './audio-store';
 import { Track, Clip } from './types';
+import { Track as DbTrack } from '@shared/schema';
 
 class AudioEngine {
   private context: AudioContext | null = null;
@@ -8,8 +9,8 @@ class AudioEngine {
   private clips: Map<number, Tone.Player> = new Map();
   private masterChannel: Tone.Channel | null = null;
   private isInitialized: boolean = false;
-  private transport: Tone.Transport;
-  private mainOut: Tone.Destination;
+  private transport: any; // Using any for Tone.Transport
+  private mainOut: any; // Using any for Tone.Destination
   
   constructor() {
     this.mainOut = Tone.getDestination();
@@ -54,21 +55,54 @@ class AudioEngine {
   /**
    * Create a new audio track
    */
-  createTrack(track: Track): Tone.Channel {
+  createTrack(track: Track | DbTrack): Tone.Channel {
     if (!this.isInitialized) {
       throw new Error('Audio engine not initialized');
     }
     
+    // Convert from DB track to Audio track if needed
+    const audioTrack: Track = this.ensureAudioTrack(track);
+    
     // Create channel for track
     const channel = new Tone.Channel({
-      volume: 0,
-      pan: 0,
-      mute: track.isMuted,
-      solo: track.isSoloed
+      volume: audioTrack.volume || 0,
+      pan: audioTrack.pan || 0,
+      mute: audioTrack.isMuted,
+      solo: audioTrack.isSoloed
     }).connect(this.masterChannel!);
     
-    this.tracks.set(track.id, channel);
+    this.tracks.set(audioTrack.id, channel);
     return channel;
+  }
+  
+  /**
+   * Ensures a track is in the AudioTrack format
+   */
+  private ensureAudioTrack(track: Track | DbTrack): Track {
+    // If it's already an AudioTrack, return it directly
+    if (typeof track.color === 'string' && 
+        typeof track.isMuted === 'boolean' && 
+        typeof track.isSoloed === 'boolean' && 
+        typeof track.isArmed === 'boolean' && 
+        typeof track.isAI === 'boolean') {
+      return track as Track;
+    }
+    
+    // Otherwise convert from DB track to AudioTrack
+    return {
+      id: track.id,
+      name: track.name,
+      type: track.type,
+      color: (track.color as string | null) || '#CCCCCC',
+      isMuted: (track.isMuted as boolean | null) || false,
+      isSoloed: (track.isSoloed as boolean | null) || false,
+      isArmed: (track.isArmed as boolean | null) || false,
+      isAI: (track.isAI as boolean | null) || false,
+      volume: (track.volume as number | null) || 0,
+      pan: (track.pan as number | null) || 0,
+      projectId: track.projectId,
+      createdAt: typeof track.createdAt === 'string' ? track.createdAt : new Date(track.createdAt).toISOString()
+    };
   }
   
   /**

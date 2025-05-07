@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Track, TrackInsert } from '@shared/schema';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Volume2, 
@@ -20,6 +19,8 @@ import { audioEngine } from '@/lib/audio-engine';
 import { audioStore } from '@/lib/audio-store';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
+import { Track as AudioTrack } from '@/lib/types';
+import { Track, TrackInsert } from '@shared/schema';
 
 interface TrackListProps {
   tracks: Track[] | undefined;
@@ -111,18 +112,8 @@ export default function TrackList({
       
       // Create track in audio engine
       if (audioEngine.isEngineInitialized()) {
-        // Convert track to expected format for audio engine
-        const audioTrack: Track = {
-          ...response,
-          color: response.color || '#CCCCCC', // Provide default if null
-          isMuted: response.isMuted || false,
-          isSoloed: response.isSoloed || false,
-          isArmed: response.isArmed || false,
-          isAI: response.isAI || false,
-          volume: response.volume || 0,
-          pan: response.pan || 0
-        };
-        audioEngine.createTrack(audioTrack);
+        // Let the audio engine handle the type conversion
+        audioEngine.createTrack(response);
       }
       
       // Reset form
