@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import MainHeader from '@/components/MainHeader';
 import TrackList from '@/components/TrackList';
@@ -8,6 +8,7 @@ import AICommandInterface from '@/components/AICommandInterface';
 import TransportControls from '@/components/TransportControls';
 import StatusFooter from '@/components/StatusFooter';
 import { useToast } from '@/hooks/use-toast';
+import useWebSocket, { ReadyState } from '@/hooks/use-websocket';
 import { Project, Track } from '@shared/schema';
 
 export default function Home() {
@@ -36,86 +37,81 @@ export default function Home() {
     enabled: !!currentProject?.id,
   });
 
-  // Set up WebSocket connection
-  useEffect(() => {
-    if (!socket && currentProject) {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      const newSocket = new WebSocket(wsUrl);
+  // Helper function to handle WebSocket messages
+  const handleWebSocketMessage = useCallback((event: WebSocketEventMap['message']) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('WebSocket message received:', data);
       
-      let pingInterval: NodeJS.Timeout;
-      
-      newSocket.onopen = () => {
-        console.log('WebSocket connection established');
-        setIsConnected(true);
+      // Handle different message types
+      if (data.type === 'pong') {
+        console.log('Received pong from server');
+      } else if (data.type === 'track_update' || data.type === 'track_created' || data.type === 'track_updated') {
+        // Would normally fetch updated tracks or update state directly
+        // For now, we'll just show a toast
         toast({
-          title: 'Connected to Fathom Studio',
-          description: 'Real-time audio collaboration is now active',
-          duration: 3000,
+          title: 'Track Update',
+          description: `Track ${data.data.name} has been updated`,
+          duration: 2000,
         });
-        
-        // Set up a ping interval to keep the connection alive
-        pingInterval = setInterval(() => {
-          if (newSocket.readyState === WebSocket.OPEN) {
-            // Send a ping message every 30 seconds
-            newSocket.send(JSON.stringify({ type: 'ping' }));
-            console.log('Ping sent to server');
-          }
-        }, 30000);
-      };
-      
-      newSocket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('WebSocket message received:', data);
-          
-          // Handle different message types
-          if (data.type === 'track_update' || data.type === 'track_created' || data.type === 'track_updated') {
-            // Would normally fetch updated tracks or update state directly
-            // For now, we'll just show a toast
-            toast({
-              title: 'Track Update',
-              description: `Track ${data.data.name} has been updated`,
-              duration: 2000,
-            });
-          } else if (data.type === 'ai_suggestion_created') {
-            toast({
-              title: 'New AI Suggestion',
-              description: data.data.suggestion,
-              duration: 4000,
-            });
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      };
-      
-      newSocket.onclose = () => {
-        console.log('WebSocket connection closed');
-        setIsConnected(false);
-        // Clear the ping interval
-        if (pingInterval) {
-          clearInterval(pingInterval);
-        }
-        // Try to reconnect after a delay
-        setTimeout(() => setSocket(null), 5000);
-      };
-      
-      newSocket.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-      
-      setSocket(newSocket);
-      
-      // Clean up on unmount
-      return () => {
-        if (pingInterval) {
-          clearInterval(pingInterval);
-        }
-        newSocket.close();
-      };
+      } else if (data.type === 'ai_suggestion_created') {
+        toast({
+          title: 'New AI Suggestion',
+          description: data.data.suggestion,
+          duration: 4000,
+        });
+      } else if (data.type === 'connected') {
+        console.log('Connection acknowledged by server:', data.message);
+      }
+    } catch (error) {
+      console.error('Error processing WebSocket message:', error);
     }
-  }, [currentProject, socket, toast]);
+  }, [toast]);
+
+  // Handle WebSocket connection open
+  const handleWebSocketOpen = useCallback((event: WebSocketEventMap['open']) => {
+    console.log('WebSocket connection established');
+    setIsConnected(true);
+    toast({
+      title: 'Connected to Fathom Studio',
+      description: 'Real-time audio collaboration is now active',
+      duration: 3000,
+    });
+  }, [toast]);
+
+  // Handle WebSocket connection close
+  const handleWebSocketClose = useCallback(() => {
+    console.log('WebSocket connection closed');
+    setIsConnected(false);
+  }, []);
+
+  // Create WebSocket URL only if we have a project
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const wsUrl = currentProject ? `${protocol}//${window.location.host}/ws` : null;
+
+  // Use our custom WebSocket hook
+  const { sendMessage, readyState, getWebSocket } = useWebSocket(
+    wsUrl || '', // Empty string when no URL is available
+    {
+      onOpen: handleWebSocketOpen,
+      onClose: handleWebSocketClose,
+      onMessage: handleWebSocketMessage,
+      shouldReconnect: !!currentProject, // Only reconnect if we have a project
+      reconnectInterval: 3000,
+      reconnectAttempts: 10,
+      pingInterval: 20000,
+    }
+  );
+
+  // Update socket ref whenever the WebSocket connection changes
+  useEffect(() => {
+    const ws = getWebSocket();
+    if (ws) {
+      setSocket(ws);
+    }
+    // Update connection status based on readyState
+    setIsConnected(readyState === ReadyState.OPEN);
+  }, [getWebSocket, readyState]);
 
   const handleTrackSelect = (trackId: number) => {
     setSelectedTrack(trackId);
@@ -123,8 +119,8 @@ export default function Home() {
 
   const handleProcessAICommand = async (command: string) => {
     // Send the command to the server
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
+    if (readyState === ReadyState.OPEN) {
+      sendMessage(JSON.stringify({
         type: 'ai_command',
         command: command,
         projectId: currentProject?.id
