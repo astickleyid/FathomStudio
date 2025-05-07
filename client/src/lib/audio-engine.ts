@@ -4,7 +4,7 @@ import { Track, Clip } from './types';
 import { Track as DbTrack } from '@shared/schema';
 
 class AudioEngine {
-  private context: AudioContext | null = null;
+  private context: any = null; // Using any to handle Tone.js context type issues
   private tracks: Map<number, Tone.Channel> = new Map();
   private clips: Map<number, Tone.Player> = new Map();
   private masterChannel: Tone.Channel | null = null;
@@ -179,16 +179,19 @@ class AudioEngine {
       return;
     }
     
+    // Use a default sample rate if not available in audioStore
+    const sampleRate = 44100; // Standard sample rate
+    
     // Convert start time from samples to seconds
-    const startTimeInSeconds = startTime / audioStore.sampleRate;
+    const startTimeInSeconds = startTime / sampleRate;
     
     // Schedule clip playback
-    this.transport.schedule((time) => {
+    this.transport.schedule((time: number) => {
       player.start(time);
       
       // Schedule stop if needed
       if (duration > 0) {
-        const durationInSeconds = duration / audioStore.sampleRate;
+        const durationInSeconds = duration / sampleRate;
         player.stop(time + durationInSeconds);
       }
     }, startTimeInSeconds);
