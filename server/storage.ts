@@ -61,6 +61,17 @@ export const storage = {
       }
     });
   },
+  
+  async getTrackById(id: number): Promise<Track | undefined> {
+    const result = await db.query.tracks.findFirst({
+      where: eq(tracks.id, id),
+      with: {
+        clips: true
+      }
+    });
+    
+    return result;
+  },
 
   async createTrack(data: TrackInsert): Promise<Track> {
     const [newTrack] = await db.insert(tracks).values(data).returning();

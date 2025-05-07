@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { openAIService } from "./openai-service";
 import { z } from "zod";
 import {
   trackInsertSchema,
@@ -294,33 +295,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Command Processing
   app.post('/api/ai/process-command', async (req: Request, res: Response) => {
     try {
-      const { command, projectId } = req.body;
+      const { command, projectId, trackId } = req.body;
       
       if (!command) {
         return res.status(400).json({ error: 'Command is required' });
       }
       
-      // Process AI command (simplified mock implementation)
-      // In a real system, this would connect to an AI processing service
-      const response = processAICommand(command);
-      
-      // If it's related to a project, create an AI suggestion
-      if (projectId) {
-        const suggestionData = {
-          botType: 'CommandBot',
-          suggestion: response.suggestion,
-          projectId: projectId,
-          trackId: response.trackId,
-        };
-        
-        const newSuggestion = await storage.createAISuggestion(suggestionData);
-        
-        // Notify connected clients about the new AI suggestion
-        broadcastToClients(wss, {
-          type: 'ai_suggestion_created',
-          data: newSuggestion
-        });
+      if (!projectId) {
+        return res.status(400).json({ error: 'Project ID is required' });
       }
+      
+      // First analyze what type of command it is
+      const commandAnalysis = await openAIService.analyzeCommand(command);
+      
+      let response: any = {
+        type: commandAnalysis.type,
+        intent: commandAnalysis.intent
+      };
+      
+      // Process the command according to its type
+      if (commandAnalysis.type === 'mix' && trackId) {
+        // Get track details to pass to the AI
+        const track = await storage.getTrackById(trackId);
+        if (track) {
+          const suggestion = await openAIService.generateMixSuggestions(trackId, track.name, projectId);
+          response.suggestion = suggestion;
+          response.trackId = trackId;
+        } else {
+          response.suggestion = "I couldn't find that track. Please select a track first or specify the track name.";
+          response.trackId = null;
+        }
+      } else if (commandAnalysis.type === 'idea') {
+        // Get project details to pass to the AI
+        const project = await storage.getProjectById(projectId);
+        if (project) {
+          // Ensure tempo and timeSignature are not null
+          const tempo = project.tempo || 120; // Default to 120 if null
+          const timeSignature = project.timeSignature || '4/4'; // Default to 4/4 if null
+          
+          const suggestion = await openAIService.generateCreativeIdeas(projectId, tempo, timeSignature);
+          response.suggestion = suggestion;
+        } else {
+          response.suggestion = "I couldn't find project details to generate ideas.";
+        }
+        response.trackId = null;
+      } else {
+        // General command processing
+        const suggestion = await openAIService.processCommand(command, projectId);
+        response.suggestion = suggestion;
+        response.trackId = null;
+      }
+      
+      // Notify connected clients about the AI response
+      broadcastToClients(wss, {
+        type: 'ai_response',
+        command: command,
+        response: response
+      });
       
       return res.status(200).json(response);
     } catch (error) {
@@ -328,44 +359,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: 'Internal server error' });
     }
   });
-  
-  // Helper function for processing AI commands (simplified)
-  function processAICommand(command: string) {
-    // For demo purposes - in a real app this would use a proper NLP system
-    const lowerCommand = command.toLowerCase();
-    
-    if (lowerCommand.includes('add reverb')) {
-      return {
-        type: 'effect',
-        action: 'add',
-        effect: 'reverb',
-        suggestion: 'I recommend adding a plate reverb with 1.2s decay time to enhance the spaciousness.',
-        trackId: null
-      };
-    } else if (lowerCommand.includes('make bass')) {
-      return {
-        type: 'eq',
-        action: 'adjust',
-        parameter: 'bass',
-        suggestion: 'Try boosting around 80Hz by +3dB with a wide Q to enhance the bass presence.',
-        trackId: null
-      };
-    } else if (lowerCommand.includes('add compression')) {
-      return {
-        type: 'effect',
-        action: 'add',
-        effect: 'compression',
-        suggestion: 'I suggest adding a compressor with 4:1 ratio, 5ms attack and 50ms release for more punch.',
-        trackId: null
-      };
-    } else {
-      return {
-        type: 'info',
-        suggestion: 'I\'m not sure how to process that request. Try asking about effects, EQ, or mixing.',
-        trackId: null
-      };
-    }
-  }
   
   return httpServer;
 }
