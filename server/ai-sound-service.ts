@@ -188,9 +188,9 @@ Only provide the JavaScript code, no explanations before or after.`;
       const sample = await storage.createSample(sampleData);
       
       return sample;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error saving AI sound:", error);
-      throw new Error("Failed to save sound: " + (error.message || "Unknown error"));
+      throw new Error("Failed to save sound: " + ((error as Error)?.message || "Unknown error"));
     }
   }
 }

@@ -14,6 +14,7 @@ import AddTrackDialog from '@/components/AddTrackDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useMobile } from '@/hooks/use-mobile';
+import { audioStore } from '@/lib/audio-store';
 import { Project, Track } from '@shared/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, Sparkles } from 'lucide-react';
@@ -43,9 +44,17 @@ export default function Home() {
   // Once we have the project, set it as current
   useEffect(() => {
     if (project) {
+      // Update local state
       setCurrentProject(project);
+      
+      // Update audio store global state
+      const { setCurrentProject: storeSetCurrentProject } = audioStore.getState();
+      storeSetCurrentProject(project);
+      
       // Open AI assistant when we have a project
       setIsAIAssistantOpen(true);
+      
+      console.log('Project set in audioStore:', project.id, project.name);
     }
   }, [project]);
 
