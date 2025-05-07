@@ -72,7 +72,7 @@ export const useWebSocket = (
         // Set up ping interval to keep connection alive
         if (pingInterval > 0) {
           pingTimeoutRef.current = window.setInterval(() => {
-            if (ws.readyState === WebSocket.OPEN) {
+            if (ws.readyState === 1) {
               ws.send(pingMessage);
               console.log('Ping sent');
             }
@@ -128,7 +128,7 @@ export const useWebSocket = (
 
   // Send a message through the WebSocket
   const sendMessage = useCallback((message: string | ArrayBufferLike | Blob | ArrayBufferView) => {
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+    if (socketRef.current && socketRef.current.readyState === 1) {
       socketRef.current.send(message);
       return true;
     }

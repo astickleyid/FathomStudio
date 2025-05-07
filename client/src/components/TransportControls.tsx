@@ -131,7 +131,7 @@ export default function TransportControls({ tempo, socket }: TransportControlsPr
     audioStore.getState().setPlaying(newPlayingState);
     
     // Send transport control message via WebSocket if connected
-    if (socket && socket.readyState === WebSocket.OPEN) {
+    if (socket && socket.readyState === 1) {
       socket.send(JSON.stringify({
         type: 'transport_control',
         action: newPlayingState ? 'play' : 'stop',
@@ -156,7 +156,7 @@ export default function TransportControls({ tempo, socket }: TransportControlsPr
       setCurrentTime('00:00.00');
       
       // Send stop message via WebSocket if connected
-      if (socket && socket.readyState === WebSocket.OPEN) {
+      if (socket && socket.readyState === 1) {
         socket.send(JSON.stringify({
           type: 'transport_control',
           action: 'stop',
@@ -187,7 +187,7 @@ export default function TransportControls({ tempo, socket }: TransportControlsPr
     audioStore.getState().setRecording(newRecordingState);
     
     // Send transport control message via WebSocket if connected
-    if (socket && socket.readyState === WebSocket.OPEN) {
+    if (socket && socket.readyState === 1) {
       socket.send(JSON.stringify({
         type: 'transport_control',
         action: newRecordingState ? 'record' : 'stop_record',
