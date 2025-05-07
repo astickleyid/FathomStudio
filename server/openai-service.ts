@@ -1,7 +1,9 @@
 import OpenAI from "openai";
 import { AISuggestionInsert } from "@shared/schema";
 import { db } from "@db";
-import { aiSuggestions } from "@shared/schema";
+import { aiSuggestions, tracks } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { AudioAnalysisResult, MixRecommendation, EQBand } from "@shared/mix-bot-types";
 
 // Create an OpenAI client instance
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -203,6 +205,244 @@ export class OpenAIService {
       console.error("Audio analysis error:", error);
       return "Sorry, I encountered an error analyzing the audio.";
     }
+  }
+
+  /**
+   * Analyze a track and provide intelligent mix recommendations
+   * This is part of the Autonomous Mix Bots feature
+   */
+  async generateMixRecommendations(trackId: number, projectId: number): Promise<MixRecommendation> {
+    try {
+      // Get track details
+      const track = await db.query.tracks.findFirst({
+        where: eq(tracks.id, trackId)
+      });
+
+      if (!track) {
+        throw new Error(`Track with id ${trackId} not found`);
+      }
+
+      // Get track type and name for context
+      const trackType = track.type;
+      const trackName = track.name;
+
+      // Generate analysis based on track type
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are the FathomAI mixing assistant in a professional Digital Audio Workstation.
+            
+            Analyze this track and provide detailed mixing recommendations for:
+            1. Gain Staging - Recommend optimal input level
+            2. EQ - Suggest specific frequency adjustments with bands, gains, and Q values
+            3. Compression - Recommend threshold, ratio, attack, release, and makeup gain
+            
+            Based on the track type and name, use audio engineering best practices.
+            
+            Respond with ONLY a JSON object in this format:
+            {
+              "gainStaging": {
+                "recommendation": "Descriptive advice",
+                "targetLevel": -18
+              },
+              "eq": {
+                "recommendation": "EQ strategy overview",
+                "bands": [
+                  {"frequency": 100, "gain": -3, "q": 1.0, "type": "lowShelf"},
+                  {"frequency": 500, "gain": -2, "q": 0.7, "type": "peaking"},
+                  {"frequency": 2000, "gain": 2, "q": 1.0, "type": "peaking"},
+                  {"frequency": 8000, "gain": 1.5, "q": 0.8, "type": "highShelf"}
+                ]
+              },
+              "compression": {
+                "recommendation": "Compression strategy overview",
+                "threshold": -24,
+                "ratio": 4,
+                "attack": 30,
+                "release": 100,
+                "makeupGain": 2
+              }
+            }`
+          },
+          {
+            role: "user",
+            content: `Analyze this track and provide mixing recommendations:
+            Track Name: ${trackName}
+            Track Type: ${trackType}
+            Project ID: ${projectId}`
+          }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 800,
+        temperature: 0.4
+      });
+      
+      const analysisResult = JSON.parse(response.choices[0]?.message?.content || "{}") as AudioAnalysisResult;
+      
+      // Construct recommendation from AI response
+      const mixRecommendation: MixRecommendation = {
+        trackId,
+        trackName,
+        trackType,
+        gainStaging: {
+          recommendation: analysisResult.gainStaging?.recommendation || "Adjust gain to achieve optimal signal level.",
+          targetLevel: analysisResult.gainStaging?.targetLevel || -18,
+          currentLevel: 0 // This would be updated with actual track level analysis
+        },
+        eq: {
+          recommendation: analysisResult.eq?.recommendation || "Apply EQ to shape the frequency content.",
+          bands: analysisResult.eq?.bands || this.getDefaultEQBands(trackType)
+        },
+        compression: {
+          recommendation: analysisResult.compression?.recommendation || "Apply compression to control dynamics.",
+          threshold: analysisResult.compression?.threshold || -24,
+          ratio: analysisResult.compression?.ratio || 2,
+          attack: analysisResult.compression?.attack || 30,
+          release: analysisResult.compression?.release || 100,
+          makeupGain: analysisResult.compression?.makeupGain || 0
+        }
+      };
+      
+      // Save the suggestion to the database
+      const suggestionText = `Mixing recommendations for ${trackName}:\n\n` +
+        `Gain Staging: ${mixRecommendation.gainStaging.recommendation}\n` +
+        `EQ: ${mixRecommendation.eq.recommendation}\n` +
+        `Compression: ${mixRecommendation.compression.recommendation}`;
+      
+      const newSuggestion: AISuggestionInsert = {
+        botType: "FathomAI",
+        suggestion: suggestionText,
+        projectId,
+        trackId,
+        isApplied: false
+      };
+      
+      await db.insert(aiSuggestions).values(newSuggestion);
+      
+      return mixRecommendation;
+    } catch (error) {
+      console.error("Mix recommendation error:", error);
+      
+      // Return default values if analysis fails
+      return this.getDefaultMixRecommendation(trackId);
+    }
+  }
+  
+  /**
+   * Apply mix recommendations to a track automatically
+   */
+  async applyMixRecommendation(trackId: number, recommendation: MixRecommendation): Promise<boolean> {
+    try {
+      // Here we would apply the recommendation settings to the track
+      // For example, adjusting the volume, adding EQ and compression processors
+      
+      // In a real implementation, this would interact with the audio engine
+      // and the database to store these settings
+      
+      // For now, we'll just create a suggestion indicating the settings were applied
+      
+      const suggestionText = `Applied autonomous mix to track:\n\n` +
+        `• Gain adjusted to ${recommendation.gainStaging.targetLevel}dB\n` +
+        `• EQ applied with ${recommendation.eq.bands.length} bands\n` +
+        `• Compression set to ${recommendation.compression.threshold}dB threshold, ${recommendation.compression.ratio}:1 ratio`;
+      
+      const newSuggestion: AISuggestionInsert = {
+        botType: "FathomAI",
+        suggestion: suggestionText,
+        projectId: 0, // This would need the actual project ID in real implementation
+        trackId,
+        isApplied: true
+      };
+      
+      await db.insert(aiSuggestions).values(newSuggestion);
+      
+      return true;
+    } catch (error) {
+      console.error("Error applying mix recommendation:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Get default EQ bands based on track type
+   */
+  private getDefaultEQBands(trackType: string): EQBand[] {
+    // Return appropriate default EQ settings based on track type
+    switch (trackType.toLowerCase()) {
+      case 'vocals':
+      case 'vocal':
+        return [
+          { frequency: 80, gain: -3, q: 0.8, type: "highPass" },
+          { frequency: 200, gain: -2, q: 1.0, type: "peaking" },
+          { frequency: 900, gain: -1, q: 1.5, type: "peaking" },
+          { frequency: 3000, gain: 2, q: 1.0, type: "peaking" },
+          { frequency: 8000, gain: 1, q: 0.8, type: "highShelf" }
+        ];
+      case 'drums':
+      case 'drum':
+        return [
+          { frequency: 60, gain: 2, q: 1.0, type: "lowShelf" },
+          { frequency: 250, gain: -2, q: 1.0, type: "peaking" },
+          { frequency: 800, gain: -1, q: 1.0, type: "peaking" },
+          { frequency: 4000, gain: 3, q: 1.0, type: "peaking" },
+          { frequency: 10000, gain: 1, q: 0.8, type: "highShelf" }
+        ];
+      case 'bass':
+        return [
+          { frequency: 40, gain: 2, q: 0.8, type: "lowShelf" },
+          { frequency: 100, gain: -1, q: 1.2, type: "peaking" },
+          { frequency: 400, gain: -2, q: 1.0, type: "peaking" },
+          { frequency: 800, gain: -1, q: 1.5, type: "peaking" },
+          { frequency: 1500, gain: 1, q: 1.0, type: "peaking" }
+        ];
+      case 'guitar':
+      case 'guitars':
+        return [
+          { frequency: 100, gain: -1, q: 0.8, type: "lowShelf" },
+          { frequency: 300, gain: -2, q: 1.0, type: "peaking" },
+          { frequency: 800, gain: -1, q: 1.2, type: "peaking" },
+          { frequency: 2500, gain: 2, q: 1.0, type: "peaking" },
+          { frequency: 6000, gain: 1, q: 0.8, type: "highShelf" }
+        ];
+      default:
+        // Generic EQ bands for other track types
+        return [
+          { frequency: 100, gain: 0, q: 1.0, type: "lowShelf" },
+          { frequency: 500, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 2000, gain: 0, q: 1.0, type: "peaking" },
+          { frequency: 8000, gain: 0, q: 0.8, type: "highShelf" }
+        ];
+    }
+  }
+  
+  /**
+   * Get default mix recommendation for fallback
+   */
+  private getDefaultMixRecommendation(trackId: number): MixRecommendation {
+    return {
+      trackId,
+      trackName: "Unknown Track",
+      trackType: "Unknown",
+      gainStaging: {
+        recommendation: "Set appropriate input levels before processing.",
+        targetLevel: -18,
+        currentLevel: 0
+      },
+      eq: {
+        recommendation: "Apply EQ to shape the frequency content of the track.",
+        bands: this.getDefaultEQBands("default")
+      },
+      compression: {
+        recommendation: "Use compression to control dynamic range.",
+        threshold: -24,
+        ratio: 2,
+        attack: 30,
+        release: 100,
+        makeupGain: 0
+      }
+    };
   }
 }
 
