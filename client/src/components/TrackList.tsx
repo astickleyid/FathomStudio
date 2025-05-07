@@ -98,8 +98,11 @@ export default function TrackList({
       };
       
       // Send API request to create track
-      const response = await apiRequest(`/api/projects/${currentProject.id}/tracks`, {
+      const response = await apiRequest<Track>(`/api/projects/${currentProject.id}/tracks`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(trackData),
       });
       
@@ -108,7 +111,18 @@ export default function TrackList({
       
       // Create track in audio engine
       if (audioEngine.isEngineInitialized()) {
-        audioEngine.createTrack(response);
+        // Convert track to expected format for audio engine
+        const audioTrack: Track = {
+          ...response,
+          color: response.color || '#CCCCCC', // Provide default if null
+          isMuted: response.isMuted || false,
+          isSoloed: response.isSoloed || false,
+          isArmed: response.isArmed || false,
+          isAI: response.isAI || false,
+          volume: response.volume || 0,
+          pan: response.pan || 0
+        };
+        audioEngine.createTrack(audioTrack);
       }
       
       // Reset form
@@ -144,8 +158,11 @@ export default function TrackList({
       const newMuteState = !track.isMuted;
       
       // Update track in database
-      await apiRequest(`/api/tracks/${track.id}`, {
+      await apiRequest<Track>(`/api/tracks/${track.id}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ isMuted: newMuteState }),
       });
       
@@ -190,8 +207,11 @@ export default function TrackList({
       const newArmState = !track.isArmed;
       
       // Update track in database
-      await apiRequest(`/api/tracks/${track.id}`, {
+      await apiRequest<Track>(`/api/tracks/${track.id}`, {
         method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ isArmed: newArmState }),
       });
       

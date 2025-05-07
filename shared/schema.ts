@@ -13,6 +13,8 @@ export const tracks = pgTable("tracks", {
   isSoloed: boolean("is_soloed").default(false),
   isArmed: boolean("is_armed").default(false),
   isAI: boolean("is_ai").default(false),
+  volume: integer("volume").default(0), // Volume in dB (-80 to +6)
+  pan: integer("pan").default(0), // Pan (-100 to +100)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   projectId: integer("project_id").notNull(),
 });
