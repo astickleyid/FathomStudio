@@ -64,7 +64,7 @@ export default function SaveProjectDialog({ open, onOpenChange, project, action 
 
   // Handle saving the project
   const handleSave = async () => {
-    if (!projectName.trim()) {
+    if (!projectName || !projectName.trim()) {
       toast({
         title: 'Error',
         description: 'Please enter a project name',
@@ -232,7 +232,7 @@ export default function SaveProjectDialog({ open, onOpenChange, project, action 
           {(action === 'save' || action === 'save-as' || action === 'new') && (
             <Button 
               onClick={handleSave} 
-              disabled={isLoading || !projectName.trim()}
+              disabled={isLoading || !projectName || !projectName.trim()}
               className="bg-[#FF7A00] hover:bg-[#CC6200] text-white"
             >
               {isLoading ? (
