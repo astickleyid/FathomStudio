@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // AI Command Processing
+  // Unified AI Command Processing
   app.post('/api/ai/process-command', async (req: Request, res: Response) => {
     try {
       const { command, projectId, trackId } = req.body;
@@ -305,46 +305,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Project ID is required' });
       }
       
-      // First analyze what type of command it is
-      const commandAnalysis = await openAIService.analyzeCommand(command);
+      // Get project details for context
+      let projectDetails = null;
+      let trackDetails = null;
       
-      let response: any = {
-        type: commandAnalysis.type,
-        intent: commandAnalysis.intent
-      };
-      
-      // Process the command according to its type
-      if (commandAnalysis.type === 'mix' && trackId) {
-        // Get track details to pass to the AI
-        const track = await storage.getTrackById(trackId);
-        if (track) {
-          const suggestion = await openAIService.generateMixSuggestions(trackId, track.name, projectId);
-          response.suggestion = suggestion;
-          response.trackId = trackId;
-        } else {
-          response.suggestion = "I couldn't find that track. Please select a track first or specify the track name.";
-          response.trackId = null;
+      try {
+        projectDetails = await storage.getProjectById(projectId);
+        
+        // If trackId is provided, get track details as well
+        if (trackId) {
+          trackDetails = await storage.getTrackById(trackId);
         }
-      } else if (commandAnalysis.type === 'idea') {
-        // Get project details to pass to the AI
-        const project = await storage.getProjectById(projectId);
-        if (project) {
-          // Ensure tempo and timeSignature are not null
-          const tempo = project.tempo || 120; // Default to 120 if null
-          const timeSignature = project.timeSignature || '4/4'; // Default to 4/4 if null
-          
-          const suggestion = await openAIService.generateCreativeIdeas(projectId, tempo, timeSignature);
-          response.suggestion = suggestion;
-        } else {
-          response.suggestion = "I couldn't find project details to generate ideas.";
-        }
-        response.trackId = null;
-      } else {
-        // General command processing
-        const suggestion = await openAIService.processCommand(command, projectId);
-        response.suggestion = suggestion;
-        response.trackId = null;
+      } catch (err) {
+        console.error("Error fetching project/track details:", err);
+        // Continue even if we can't get details - the AI can still work with minimal context
       }
+      
+      // Process the command with our unified AI assistant
+      const aiResponse = await openAIService.processAICommand(
+        command, 
+        projectId, 
+        projectDetails, 
+        trackDetails
+      );
+      
+      // Build the response
+      const response = {
+        type: aiResponse.intent,
+        intent: aiResponse.intent,
+        suggestion: aiResponse.suggestion,
+        trackId: trackDetails?.id || null,
+        action: aiResponse.action,
+        parameters: aiResponse.parameters
+      };
       
       // Notify connected clients about the AI response
       broadcastToClients(wss, {
@@ -356,6 +349,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json(response);
     } catch (error) {
       console.error('Error processing AI command:', error);
+      return res.status(500).json({ 
+        error: 'Failed to process AI command', 
+        suggestion: 'I encountered an error processing your request. Please try again.',
+        type: 'error',
+        intent: 'error'
+      });
+    }
+  });
+  
+  // Get personalized welcome message for a project
+  app.get('/api/projects/:projectId/welcome-message', async (req: Request, res: Response) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      
+      // Get project details
+      const project = await storage.getProjectById(projectId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      // Get number of tracks
+      const tracks = await storage.getTracksByProjectId(projectId);
+      const tracksCount = tracks.length;
+      
+      // Generate welcome message
+      const message = await openAIService.generateWelcomeMessage(
+        projectId,
+        project.name,
+        tracksCount
+      );
+      
+      return res.status(200).json({ message });
+    } catch (error) {
+      console.error('Error generating welcome message:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   });

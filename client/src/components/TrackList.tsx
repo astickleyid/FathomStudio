@@ -1,5 +1,25 @@
-import { Track } from '@shared/schema';
+import { useState } from 'react';
+import { Track, TrackInsert } from '@shared/schema';
 import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  Volume2, 
+  VolumeX, 
+  ListMusic, 
+  Music, 
+  Mic, 
+  Plus, 
+  Trash2, 
+  Copy, 
+  MoreVertical,
+  MessageSquareText,
+  Computer,
+  MoveVertical
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { audioEngine } from '@/lib/audio-engine';
+import { audioStore } from '@/lib/audio-store';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 
 interface TrackListProps {
   tracks: Track[] | undefined;
@@ -14,64 +34,484 @@ export default function TrackList({
   selectedTrackId, 
   onSelectTrack 
 }: TrackListProps) {
+  const [isAddingTrack, setIsAddingTrack] = useState(false);
+  const [newTrackName, setNewTrackName] = useState('');
+  const [newTrackType, setNewTrackType] = useState('audio');
+  const [trackActionsOpen, setTrackActionsOpen] = useState<number | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Create a new track
+  const handleCreateTrack = async () => {
+    if (!newTrackName.trim()) {
+      toast({
+        title: "Track name required",
+        description: "Please enter a name for the new track",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // Get current project from global state
+      const currentProject = audioStore.getState().currentProject;
+      
+      if (!currentProject) {
+        toast({
+          title: "No active project",
+          description: "Please open a project to add tracks",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setIsAddingTrack(true);
+      
+      // Generate a color based on track type
+      let color;
+      switch (newTrackType) {
+        case 'audio':
+          color = '#5D87FF';
+          break;
+        case 'midi':
+          color = '#9747FF';
+          break;
+        case 'vocal':
+          color = '#FF7A00';
+          break;
+        default:
+          color = '#CCCCCC';
+      }
+      
+      // Create track data
+      const trackData: Partial<TrackInsert> = {
+        name: newTrackName,
+        type: newTrackType,
+        color: color,
+        isMuted: false,
+        isSoloed: false,
+        isArmed: false,
+        isAI: false,
+        projectId: currentProject.id,
+        volume: 0,
+        pan: 0
+      };
+      
+      // Send API request to create track
+      const response = await apiRequest(`/api/projects/${currentProject.id}/tracks`, {
+        method: 'POST',
+        body: JSON.stringify(trackData),
+      });
+      
+      // Update query cache
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', currentProject.id, 'tracks'] });
+      
+      // Create track in audio engine
+      if (audioEngine.isEngineInitialized()) {
+        audioEngine.createTrack(response);
+      }
+      
+      // Reset form
+      setNewTrackName('');
+      setNewTrackType('audio');
+      setIsAddingTrack(false);
+      
+      // Show success message
+      toast({
+        title: "Track created",
+        description: `Track "${response.name}" has been created`,
+      });
+      
+      // Select the new track
+      onSelectTrack(response.id);
+      
+    } catch (error) {
+      console.error("Error creating track:", error);
+      toast({
+        title: "Failed to create track",
+        description: "There was an error creating the track. Please try again.",
+        variant: "destructive",
+      });
+      setIsAddingTrack(false);
+    }
+  };
+  
+  // Toggle track mute state
+  const handleToggleMute = async (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent track selection
+    
+    try {
+      const newMuteState = !track.isMuted;
+      
+      // Update track in database
+      await apiRequest(`/api/tracks/${track.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isMuted: newMuteState }),
+      });
+      
+      // Update audio engine
+      if (audioEngine.isEngineInitialized()) {
+        audioEngine.updateTrack(track.id, { mute: newMuteState });
+      }
+      
+      // Update track state in cache
+      queryClient.setQueryData(
+        ['/api/projects', track.projectId, 'tracks'],
+        (oldData: Track[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map(t => 
+            t.id === track.id ? { ...t, isMuted: newMuteState } : t
+          );
+        }
+      );
+      
+      // Show toast notification
+      toast({
+        title: newMuteState ? "Track Muted" : "Track Unmuted",
+        description: `Track "${track.name}" has been ${newMuteState ? "muted" : "unmuted"}`,
+        duration: 2000,
+      });
+      
+    } catch (error) {
+      console.error("Error toggling track mute:", error);
+      toast({
+        title: "Failed to update track",
+        description: "There was an error updating the track. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Toggle track arm state for recording
+  const handleToggleArm = async (track: Track, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent track selection
+    
+    try {
+      const newArmState = !track.isArmed;
+      
+      // Update track in database
+      await apiRequest(`/api/tracks/${track.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isArmed: newArmState }),
+      });
+      
+      // Update track state in cache
+      queryClient.setQueryData(
+        ['/api/projects', track.projectId, 'tracks'],
+        (oldData: Track[] | undefined) => {
+          if (!oldData) return oldData;
+          return oldData.map(t => 
+            t.id === track.id ? { ...t, isArmed: newArmState } : t
+          );
+        }
+      );
+      
+      // Show toast notification
+      toast({
+        title: newArmState ? "Track Armed" : "Track Disarmed",
+        description: `Track "${track.name}" is ${newArmState ? "now" : "no longer"} armed for recording`,
+        duration: 2000,
+      });
+      
+    } catch (error) {
+      console.error("Error toggling track arm:", error);
+      toast({
+        title: "Failed to update track",
+        description: "There was an error updating the track. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Get icon for track type
+  const getTrackTypeIcon = (trackType: string) => {
+    switch (trackType.toLowerCase()) {
+      case 'audio':
+        return <ListMusic className="w-4 h-4" />;
+      case 'midi':
+        return <Music className="w-4 h-4" />;
+      case 'vocal':
+        return <Mic className="w-4 h-4" />;
+      case 'ai':
+        return <Computer className="w-4 h-4" />;
+      default:
+        return <ListMusic className="w-4 h-4" />;
+    }
+  };
+  
+  // Get color for track based on type or custom color
+  const getTrackColor = (track: Track) => {
+    if (track.color) return track.color;
+    
+    // Default colors based on type
+    switch (track.type.toLowerCase()) {
+      case 'audio':
+        return '#5D87FF';
+      case 'midi':
+        return '#9747FF';
+      case 'vocal':
+        return '#FF7A00';
+      case 'ai':
+        return '#00CC88';
+      default:
+        return '#CCCCCC';
+    }
+  };
+  
   if (isLoading) {
     return (
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        <div className="p-3 border-b border-[#333333]">
+      <div className="flex-1 flex flex-col">
+        <div className="p-3 border-b border-[#333333] flex justify-between items-center">
           <h2 className="text-lg font-medium">Tracks</h2>
         </div>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Skeleton key={i} className="h-10 w-full rounded-md" />
-        ))}
+        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-md" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="p-3 border-b border-[#333333]">
+    <div className="flex-1 flex flex-col max-h-full">
+      <div className="p-3 border-b border-[#333333] flex justify-between items-center">
         <h2 className="text-lg font-medium">Tracks</h2>
+        <button 
+          onClick={() => setIsAddingTrack(!isAddingTrack)}
+          className="p-1.5 bg-[#252525] hover:bg-[#333333] rounded-full transition-colors"
+        >
+          <Plus className="w-4 h-4 text-white" />
+        </button>
       </div>
       
+      {/* Add Track Form */}
+      {isAddingTrack && (
+        <div className="p-3 border-b border-[#333333] bg-[#1A1A1A]">
+          <div className="mb-2">
+            <input 
+              type="text"
+              value={newTrackName}
+              onChange={(e) => setNewTrackName(e.target.value)}
+              placeholder="Track name"
+              className="w-full p-2 bg-[#252525] border border-[#333333] rounded-md text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#FF7A00]"
+            />
+          </div>
+          
+          <div className="mb-3 flex space-x-2">
+            <button 
+              className={`flex-1 p-1.5 text-xs rounded-md ${newTrackType === 'audio' ? 'bg-[#5D87FF] text-white' : 'bg-[#252525] text-[#999999] hover:bg-[#333333]'}`}
+              onClick={() => setNewTrackType('audio')}
+            >
+              Audio
+            </button>
+            <button 
+              className={`flex-1 p-1.5 text-xs rounded-md ${newTrackType === 'midi' ? 'bg-[#9747FF] text-white' : 'bg-[#252525] text-[#999999] hover:bg-[#333333]'}`}
+              onClick={() => setNewTrackType('midi')}
+            >
+              MIDI
+            </button>
+            <button 
+              className={`flex-1 p-1.5 text-xs rounded-md ${newTrackType === 'vocal' ? 'bg-[#FF7A00] text-white' : 'bg-[#252525] text-[#999999] hover:bg-[#333333]'}`}
+              onClick={() => setNewTrackType('vocal')}
+            >
+              Vocal
+            </button>
+          </div>
+          
+          <div className="flex space-x-2">
+            <button 
+              onClick={() => setIsAddingTrack(false)}
+              className="flex-1 p-1.5 bg-[#252525] hover:bg-[#333333] text-[#999999] rounded-md text-xs transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleCreateTrack}
+              className="flex-1 p-1.5 bg-[#FF7A00] hover:bg-[#CC6200] text-white rounded-md text-xs transition-colors"
+              disabled={!newTrackName.trim() || isAddingTrack}
+            >
+              {isAddingTrack ? 'Creating...' : 'Create Track'}
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Track List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {tracks && tracks.length > 0 ? (
           tracks.map((track) => (
             <div 
               key={track.id}
-              className={`flex items-center p-2 rounded-md cursor-pointer ${
+              className={`flex flex-col rounded-md cursor-pointer transition-colors ${
                 selectedTrackId === track.id 
-                  ? 'bg-[#FF7A00] bg-opacity-20' 
-                  : 'hover:bg-[#252525] hover:bg-opacity-20'
+                  ? 'bg-[#252525]' 
+                  : 'hover:bg-[#1A1A1A]'
               }`}
               onClick={() => onSelectTrack(track.id)}
             >
-              <span 
-                className={`w-6 h-6 flex items-center justify-center rounded-md text-xs font-bold ${
-                  track.isAI ? 'bg-[#FF7A00]' : 'bg-[#252525]'
-                }`}
-              >
-                {track.name.charAt(0)}
-              </span>
-              <span className="ml-2 text-white">{track.name}</span>
-              <div className="ml-auto flex items-center space-x-1">
-                <div className={`w-2 h-2 rounded-full ${
-                  track.isAI ? 'bg-[#FF7A00]' : 'bg-[#333333]'
-                }`}></div>
-                <span className="text-xs text-[#999999]">
-                  {track.isAI ? 'AI' : (track.type && track.type.length > 0 ? track.type.charAt(0).toUpperCase() : 'A')}
-                </span>
+              {/* Main Track Row */}
+              <div className="flex items-center p-2">
+                {/* Track Color and Type Icon */}
+                <div 
+                  className="w-7 h-7 flex items-center justify-center rounded-md text-white mr-2"
+                  style={{ backgroundColor: getTrackColor(track) }}
+                >
+                  {getTrackTypeIcon(track.type)}
+                </div>
+                
+                {/* Track Name */}
+                <div className="flex-1 truncate">
+                  <div className="text-sm font-medium text-white">{track.name}</div>
+                  <div className="text-xs text-[#999999]">{track.type}</div>
+                </div>
+                
+                {/* Track Controls */}
+                <div className="flex items-center space-x-1 ml-1">
+                  {/* Mute Button */}
+                  <button 
+                    className={`p-1.5 rounded-md ${
+                      track.isMuted 
+                        ? 'bg-[#333333] text-[#FF7A00]' 
+                        : 'hover:bg-[#252525] text-[#999999]'
+                    }`}
+                    onClick={(e) => handleToggleMute(track, e)}
+                    title={track.isMuted ? 'Unmute' : 'Mute'}
+                  >
+                    {track.isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                  
+                  {/* Arm Button */}
+                  <button 
+                    className={`p-1.5 rounded-md ${
+                      track.isArmed 
+                        ? 'bg-[#333333] text-red-500' 
+                        : 'hover:bg-[#252525] text-[#999999]'
+                    }`}
+                    onClick={(e) => handleToggleArm(track, e)}
+                    title={track.isArmed ? 'Disarm' : 'Arm for Recording'}
+                  >
+                    <Mic className={`w-3.5 h-3.5 ${track.isArmed ? 'animate-pulse' : ''}`} />
+                  </button>
+                  
+                  {/* More Options Button */}
+                  <button 
+                    className="p-1.5 hover:bg-[#252525] text-[#999999] rounded-md relative"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTrackActionsOpen(trackActionsOpen === track.id ? null : track.id);
+                    }}
+                    title="More Options"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                    
+                    {/* Track Actions Dropdown */}
+                    {trackActionsOpen === track.id && (
+                      <div className="absolute right-0 top-full mt-1 w-40 bg-[#1A1A1A] shadow-lg rounded-md border border-[#333333] z-10">
+                        <button 
+                          className="w-full flex items-center p-2 text-xs hover:bg-[#252525] text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Duplicate track functionality
+                            toast({
+                              title: "Feature coming soon",
+                              description: "Duplicate track feature will be available in the next update",
+                            });
+                            setTrackActionsOpen(null);
+                          }}
+                        >
+                          <Copy className="w-3.5 h-3.5 mr-2" />
+                          Duplicate Track
+                        </button>
+                        
+                        <button 
+                          className="w-full flex items-center p-2 text-xs hover:bg-[#252525] text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // AI enhancement functionality
+                            toast({
+                              title: "Feature coming soon",
+                              description: "AI enhancement feature will be available in the next update",
+                            });
+                            setTrackActionsOpen(null);
+                          }}
+                        >
+                          <Computer className="w-3.5 h-3.5 mr-2" />
+                          AI Enhance
+                        </button>
+                        
+                        <button 
+                          className="w-full flex items-center p-2 text-xs hover:bg-[#252525] text-left"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Track reordering functionality
+                            toast({
+                              title: "Feature coming soon",
+                              description: "Track reordering feature will be available in the next update",
+                            });
+                            setTrackActionsOpen(null);
+                          }}
+                        >
+                          <MoveVertical className="w-3.5 h-3.5 mr-2" />
+                          Reorder Track
+                        </button>
+                        
+                        <button 
+                          className="w-full flex items-center p-2 text-xs hover:bg-[#252525] text-left text-red-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Delete track functionality
+                            toast({
+                              title: "Feature coming soon",
+                              description: "Delete track feature will be available in the next update",
+                              variant: "destructive",
+                            });
+                            setTrackActionsOpen(null);
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
+                          Delete Track
+                        </button>
+                      </div>
+                    )}
+                  </button>
+                </div>
               </div>
+              
+              {/* Track volume indicator (only shown for selected track) */}
+              {selectedTrackId === track.id && (
+                <div className="px-2 pb-2">
+                  <div className="h-1 w-full bg-[#333333] rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-[#FF7A00] to-[#CC6200]" 
+                      style={{ width: `${(track.volume ?? 0) + 80}%` }} // Convert from dB to percentage
+                    ></div>
+                  </div>
+                </div>
+              )}
             </div>
           ))
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-[#999999]">
-            <p>No tracks yet</p>
-            <button className="mt-2 px-3 py-1 text-sm bg-[#FF7A00] rounded text-white hover:bg-[#CC6200]">
+            <p className="mb-2">No tracks yet</p>
+            <button 
+              className="px-3 py-1.5 text-sm bg-[#FF7A00] rounded-md text-white hover:bg-[#CC6200] flex items-center"
+              onClick={() => setIsAddingTrack(true)}
+            >
+              <Plus className="w-4 h-4 mr-1.5" />
               Create Track
             </button>
           </div>
         )}
       </div>
-    </>
+      
+      {/* Click away handler for dropdowns */}
+      {trackActionsOpen !== null && (
+        <div 
+          className="fixed inset-0 z-10" 
+          onClick={() => setTrackActionsOpen(null)}
+        />
+      )}
+    </div>
   );
 }
