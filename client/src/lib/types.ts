@@ -9,6 +9,23 @@ export interface Project {
   updatedAt: string;
 }
 
+// Helper function to convert database project to frontend type
+export function adaptProjectToFrontendType(dbProject: any): Project {
+  return {
+    id: dbProject.id,
+    name: dbProject.name,
+    tempo: dbProject.tempo ?? 120,  // Default if null
+    timeSignature: dbProject.timeSignature ?? '4/4',  // Default if null
+    sampleRate: dbProject.sampleRate ?? 44100,  // Default if null 
+    createdAt: typeof dbProject.createdAt === 'string' 
+      ? dbProject.createdAt 
+      : new Date().toISOString(),
+    updatedAt: typeof dbProject.updatedAt === 'string' 
+      ? dbProject.updatedAt 
+      : new Date().toISOString()
+  };
+}
+
 // Track type for frontend use
 export interface Track {
   id: number;

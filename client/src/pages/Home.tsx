@@ -15,7 +15,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/use-websocket';
 import { useMobile } from '@/hooks/use-mobile';
 import { audioStore } from '@/lib/audio-store';
-import { Project, Track } from '@shared/schema';
+import { Project as DbProject, Track as DbTrack } from '@shared/schema';
+import { Project, Track, adaptProjectToFrontendType } from '@/lib/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChevronDown, Sparkles } from 'lucide-react';
 
@@ -41,20 +42,58 @@ export default function Home() {
     enabled: !!projectId,
   });
 
+  // Helper function to adapt database project to frontend Project type
+  const adaptProjectToFrontendType = (dbProject: any): Project => {
+    return {
+      id: dbProject.id,
+      name: dbProject.name,
+      tempo: dbProject.tempo ?? 120, // Use nullish coalescing to handle null
+      timeSignature: dbProject.timeSignature ?? '4/4',
+      sampleRate: dbProject.sampleRate ?? 44100,
+      createdAt: typeof dbProject.createdAt === 'string' 
+        ? dbProject.createdAt 
+        : dbProject.createdAt instanceof Date 
+          ? dbProject.createdAt.toISOString() 
+          : new Date().toISOString(),
+      updatedAt: typeof dbProject.updatedAt === 'string' 
+        ? dbProject.updatedAt 
+        : dbProject.updatedAt instanceof Date 
+          ? dbProject.updatedAt.toISOString() 
+          : new Date().toISOString()
+    };
+  };
+
   // Once we have the project, set it as current
   useEffect(() => {
     if (project) {
+      console.log('Original project from API:', project);
+      
+      // Use type assertion to fix TypeScript issues
+      const typeSafeProject: Project = {
+        id: project.id,
+        name: project.name,
+        tempo: project.tempo ?? 120,
+        timeSignature: project.timeSignature ?? '4/4',
+        sampleRate: project.sampleRate ?? 44100,
+        createdAt: typeof project.createdAt === 'string' 
+          ? project.createdAt 
+          : new Date().toISOString(),
+        updatedAt: typeof project.updatedAt === 'string' 
+          ? project.updatedAt 
+          : new Date().toISOString()
+      };
+      
       // Update local state
-      setCurrentProject(project);
+      setCurrentProject(typeSafeProject);
       
       // Update audio store global state
       const { setCurrentProject: storeSetCurrentProject } = audioStore.getState();
-      storeSetCurrentProject(project);
+      storeSetCurrentProject(typeSafeProject);
       
       // Open AI assistant when we have a project
       setIsAIAssistantOpen(true);
       
-      console.log('Project set in audioStore:', project.id, project.name);
+      console.log('Project set in audioStore:', typeSafeProject.id, typeSafeProject.name);
     }
   }, [project]);
 
