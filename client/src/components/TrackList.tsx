@@ -74,17 +74,8 @@ export default function TrackList({
     }
   }, [lastMessage, toast, queryClient, tracks]);
   
-  // Create a new track
-  const handleCreateTrack = async () => {
-    if (!newTrackName.trim()) {
-      toast({
-        title: "Track name required",
-        description: "Please enter a name for the new track",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+  // Create a new track with a default name and specified type
+  const handleCreateTrack = async (type = newTrackType, name = newTrackName) => {
     try {
       // Get current project from global state
       const currentProject = audioStore.getState().currentProject;
@@ -98,11 +89,14 @@ export default function TrackList({
         return;
       }
       
+      // If name is not provided through form, use a default name based on type
+      const trackName = name.trim() || `${type.charAt(0).toUpperCase() + type.slice(1)} Track ${Math.floor(Math.random() * 1000)}`;
+      
       setIsAddingTrack(true);
       
       // Generate a color based on track type
       let color;
-      switch (newTrackType) {
+      switch (type) {
         case 'audio':
           color = '#5D87FF';
           break;
@@ -118,8 +112,8 @@ export default function TrackList({
       
       // Create track data
       const trackData: Partial<TrackInsert> = {
-        name: newTrackName,
-        type: newTrackType,
+        name: trackName,
+        type: type,
         color: color,
         isMuted: false,
         isSoloed: false,
@@ -490,67 +484,38 @@ export default function TrackList({
               Live
             </span>
           )}
-          <button 
-            onClick={() => setIsAddingTrack(!isAddingTrack)}
-            className="p-1.5 bg-[#FF7A00] hover:bg-[#CC6200] rounded-full transition-colors"
-            title="Add New Track"
-          >
-            <Plus className="w-4 h-4 text-white" />
-          </button>
-        </div>
-      </div>
-      
-      {/* Add Track Form */}
-      {isAddingTrack && (
-        <div className="p-3 border-b border-[#333333] bg-[#1A1A1A]">
-          <div className="mb-2">
-            <input 
-              type="text"
-              value={newTrackName}
-              onChange={(e) => setNewTrackName(e.target.value)}
-              placeholder="Track name"
-              className="w-full p-2 bg-[#252525] border border-[#333333] rounded-md text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#FF7A00]"
-            />
-          </div>
           
-          <div className="mb-3 flex space-x-2">
+          {/* Quick Add Track Buttons */}
+          <div className="flex gap-1">
             <button 
-              className={`flex-1 p-1.5 text-xs rounded-md ${newTrackType === 'audio' ? 'bg-[#5D87FF] text-white' : 'bg-[#252525] text-[#999999] hover:bg-[#333333]'}`}
-              onClick={() => setNewTrackType('audio')}
+              onClick={() => handleCreateTrack('audio')}
+              className="p-1.5 bg-[#5D87FF] hover:bg-[#4A6BCC] rounded-full transition-colors"
+              title="Add Audio Track"
+              disabled={isAddingTrack}
             >
-              Audio
+              <ListMusic className="w-3.5 h-3.5 text-white" />
             </button>
+            
             <button 
-              className={`flex-1 p-1.5 text-xs rounded-md ${newTrackType === 'midi' ? 'bg-[#9747FF] text-white' : 'bg-[#252525] text-[#999999] hover:bg-[#333333]'}`}
-              onClick={() => setNewTrackType('midi')}
+              onClick={() => handleCreateTrack('midi')}
+              className="p-1.5 bg-[#9747FF] hover:bg-[#7939CC] rounded-full transition-colors"
+              title="Add MIDI Track"
+              disabled={isAddingTrack}
             >
-              MIDI
+              <Music className="w-3.5 h-3.5 text-white" />
             </button>
+            
             <button 
-              className={`flex-1 p-1.5 text-xs rounded-md ${newTrackType === 'vocal' ? 'bg-[#FF7A00] text-white' : 'bg-[#252525] text-[#999999] hover:bg-[#333333]'}`}
-              onClick={() => setNewTrackType('vocal')}
+              onClick={() => handleCreateTrack('vocal')}
+              className="p-1.5 bg-[#FF7A00] hover:bg-[#CC6200] rounded-full transition-colors"
+              title="Add Vocal Track"
+              disabled={isAddingTrack}
             >
-              Vocal
-            </button>
-          </div>
-          
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => setIsAddingTrack(false)}
-              className="flex-1 p-1.5 bg-[#252525] hover:bg-[#333333] text-[#999999] rounded-md text-xs transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={handleCreateTrack}
-              className="flex-1 p-1.5 bg-[#FF7A00] hover:bg-[#CC6200] text-white rounded-md text-xs transition-colors"
-              disabled={!newTrackName.trim() || isAddingTrack}
-            >
-              {isAddingTrack ? 'Creating...' : 'Create Track'}
+              <Mic className="w-3.5 h-3.5 text-white" />
             </button>
           </div>
         </div>
-      )}
+      </div>
       
       {/* Track List */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1" ref={trackListRef}>
@@ -789,14 +754,33 @@ export default function TrackList({
           ))
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-[#999999]">
-            <p className="mb-2">No tracks yet</p>
-            <button 
-              className="px-3 py-1.5 text-sm bg-[#FF7A00] rounded-md text-white hover:bg-[#CC6200] flex items-center shadow-lg"
-              onClick={() => setIsAddingTrack(true)}
-            >
-              <Plus className="w-4 h-4 mr-1.5" />
-              Create Track
-            </button>
+            <p className="mb-4">No tracks yet</p>
+            <div className="flex flex-col md:flex-row gap-2">
+              <button 
+                className="px-3 py-2 text-sm bg-[#5D87FF] hover:bg-[#4A6BCC] rounded-md text-white flex items-center justify-center"
+                onClick={() => handleCreateTrack('audio')}
+                disabled={isAddingTrack}
+              >
+                <ListMusic className="w-4 h-4 mr-1.5" />
+                Audio Track
+              </button>
+              <button 
+                className="px-3 py-2 text-sm bg-[#9747FF] hover:bg-[#7939CC] rounded-md text-white flex items-center justify-center"
+                onClick={() => handleCreateTrack('midi')}
+                disabled={isAddingTrack}
+              >
+                <Music className="w-4 h-4 mr-1.5" />
+                MIDI Track
+              </button>
+              <button 
+                className="px-3 py-2 text-sm bg-[#FF7A00] hover:bg-[#CC6200] rounded-md text-white flex items-center justify-center"
+                onClick={() => handleCreateTrack('vocal')}
+                disabled={isAddingTrack}
+              >
+                <Mic className="w-4 h-4 mr-1.5" />
+                Vocal Track
+              </button>
+            </div>
           </div>
         )}
       </div>
