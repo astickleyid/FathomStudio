@@ -20,8 +20,9 @@ export default function Home() {
   const { toast } = useToast();
 
   // Get the project ID from the URL
-  const [, params] = useLocation();
-  const projectId = params ? parseInt(params.id) : null;
+  const [location] = useLocation();
+  const projectIdMatch = location.match(/\/project\/(\d+)/);
+  const projectId = projectIdMatch ? parseInt(projectIdMatch[1]) : null;
 
   // Query to get the specific project
   const { data: project, isLoading: isLoadingProjects } = useQuery<Project>({
@@ -128,7 +129,8 @@ export default function Home() {
       sendMessage(JSON.stringify({
         type: 'ai_command',
         command: command,
-        projectId: currentProject?.id
+        projectId: currentProject?.id,
+        trackId: selectedTrack
       }));
     }
     
@@ -140,7 +142,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           command,
-          projectId: currentProject?.id
+          projectId: currentProject?.id,
+          trackId: selectedTrack
         }),
       });
       
@@ -152,9 +155,18 @@ export default function Home() {
       
       toast({
         title: 'AI Response',
-        description: data.suggestion,
+        description: data.suggestion || data.intent || 'Processing command...',
         duration: 5000,
       });
+      
+      // If there's a track-specific suggestion, show it differently
+      if (data.trackId && data.type === 'mix') {
+        toast({
+          title: `Track Mix Suggestion`,
+          description: data.suggestion,
+          duration: 8000,
+        });
+      }
       
       return data;
     } catch (error) {
@@ -190,6 +202,7 @@ export default function Home() {
           <AICommandInterface 
             onProcessCommand={handleProcessAICommand}
             isConnected={isConnected}
+            projectId={currentProject?.id}
           />
         </div>
         
