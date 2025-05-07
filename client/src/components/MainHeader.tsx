@@ -40,12 +40,24 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
   const handleSave = () => {
     if (!project) return;
     
-    setIsSaving(true);
-    
-    // Simulate saving project
-    setTimeout(() => {
-      setIsSaving(false);
-    }, 800);
+    // Open save dialog
+    setSaveDialogAction('save');
+    setSaveDialogOpen(true);
+  };
+  
+  const handleSaveAs = () => {
+    setSaveDialogAction('save-as');
+    setSaveDialogOpen(true);
+  };
+  
+  const handleOpenProject = () => {
+    setSaveDialogAction('open');
+    setSaveDialogOpen(true);
+  };
+  
+  const handleNewProject = () => {
+    setSaveDialogAction('new');
+    setSaveDialogOpen(true);
   };
   
   const handleTempoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,11 +128,34 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
             <div className="p-2 space-y-1">
               <button 
                 className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors"
-                onClick={handleSave}
-                disabled={isSaving || !project}
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleSave();
+                }}
+                disabled={!project}
               >
                 <Save className="w-3 h-3 mr-1.5" />
-                {isSaving ? 'Saving...' : 'Save Project'}
+                Save Project
+              </button>
+              <button 
+                className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleNewProject();
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1.5" />
+                New Project
+              </button>
+              <button 
+                className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  handleOpenProject();
+                }}
+              >
+                <FolderOpen className="w-3 h-3 mr-1.5" />
+                Open Project
               </button>
               <Link href="/" 
                 className="flex items-center px-2 py-1.5 text-xs hover:bg-[#252525] rounded-md transition-colors"
@@ -160,9 +195,15 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
               
               <hr className="my-1 border-[#333333]" />
               
-              <button className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors">
-                <Settings className="w-3 h-3 mr-1.5" />
-                Settings
+              <button 
+                className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setIsAudioSettingsOpen(true);
+                }}
+              >
+                <Volume2 className="w-3 h-3 mr-1.5" />
+                Audio Settings
               </button>
               <button className="flex items-center px-2 py-1.5 text-xs w-full text-left hover:bg-[#252525] rounded-md transition-colors text-[#FF7A00]">
                 <Home className="w-3 h-3 mr-1.5" />
@@ -178,6 +219,21 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
             className="fixed inset-0 z-20" 
             onClick={() => setIsMobileMenuOpen(false)}
           />
+        )}
+        
+        {/* Save/Load Project Dialog */}
+        <SaveProjectDialog 
+          open={saveDialogOpen}
+          onOpenChange={setSaveDialogOpen}
+          project={project}
+          action={saveDialogAction}
+        />
+        
+        {/* Audio Settings Dialog */}
+        {isAudioSettingsOpen && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <AudioSettings onClose={() => setIsAudioSettingsOpen(false)} />
+          </div>
         )}
       </header>
     );
@@ -221,20 +277,47 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
                   <Home className="w-4 h-4 mr-2" />
                   Project Browser
                 </Link>
-                <Link href="/" 
-                  className="flex items-center px-3 py-2 text-sm hover:bg-[#252525] rounded-md transition-colors"
-                  onClick={() => setIsProjectMenuOpen(false)}
+                <button 
+                  className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                  onClick={() => {
+                    setIsProjectMenuOpen(false);
+                    handleNewProject();
+                  }}
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   New Project
-                </Link>
+                </button>
                 <button 
                   className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors"
-                  onClick={handleSave}
-                  disabled={isSaving || !project}
+                  onClick={() => {
+                    setIsProjectMenuOpen(false);
+                    handleOpenProject();
+                  }}
+                >
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Open Project
+                </button>
+                <button 
+                  className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                  onClick={() => {
+                    setIsProjectMenuOpen(false);
+                    handleSave();
+                  }}
+                  disabled={!project}
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Save Project
+                </button>
+                <button 
+                  className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                  onClick={() => {
+                    setIsProjectMenuOpen(false);
+                    handleSaveAs();
+                  }}
+                  disabled={!project}
+                >
+                  <HardDrive className="w-4 h-4 mr-2" />
+                  Save Project As
                 </button>
                 <button 
                   className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors"
@@ -300,7 +383,10 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
             <Music className="w-3.5 h-3.5 mr-1.5" />
             Mix
           </button>
-          <button className="px-3 py-1.5 bg-[#252525] rounded text-white text-xs hover:bg-[#333333] flex items-center">
+          <button 
+            className="px-3 py-1.5 bg-[#252525] rounded text-white text-xs hover:bg-[#333333] flex items-center"
+            onClick={() => setIsAudioSettingsOpen(true)}
+          >
             <Volume2 className="w-3.5 h-3.5 mr-1.5" />
             Audio
           </button>
@@ -377,7 +463,13 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
                   <Settings className="w-4 h-4 mr-2" />
                   Preferences
                 </button>
-                <button className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors">
+                <button 
+                  className="flex items-center px-3 py-2 text-sm w-full text-left hover:bg-[#252525] rounded-md transition-colors"
+                  onClick={() => {
+                    setIsSettingsOpen(false);
+                    setIsAudioSettingsOpen(true);
+                  }}
+                >
                   <Volume2 className="w-4 h-4 mr-2" />
                   Audio Settings
                 </button>
@@ -405,6 +497,21 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
             setIsProjectMenuOpen(false);
           }}
         />
+      )}
+      
+      {/* Save/Load Project Dialog */}
+      <SaveProjectDialog 
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        project={project}
+        action={saveDialogAction}
+      />
+      
+      {/* Audio Settings Dialog */}
+      {isAudioSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <AudioSettings onClose={() => setIsAudioSettingsOpen(false)} />
+        </div>
       )}
     </header>
   );
