@@ -242,4 +242,45 @@
   .border-fathom-orange {
     @apply border-[#FF7A00];
   }
+  
+  /* Mobile gesture animation utilities */
+  .animate-slide-left {
+    animation: slideLeft 0.3s ease-in-out;
+  }
+  
+  .animate-slide-right {
+    animation: slideRight 0.3s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-in-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-in-out;
+  }
+  
+  @keyframes slideLeft {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(-15px); }
+    100% { transform: translateX(0); }
+  }
+  
+  @keyframes slideRight {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(15px); }
+    100% { transform: translateX(0); }
+  }
+  
+  @keyframes slideUp {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0); }
+  }
+  
+  @keyframes slideDown {
+    0% { transform: translateY(0); }
+    50% { transform: translateY(10px); }
+    100% { transform: translateY(0); }
+  }
 }

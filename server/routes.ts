@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import { openAIService } from "./openai-service";
 import { z } from "zod";
@@ -51,6 +51,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             command: data.command,
             result: data.result
           });
+        } else if (data.type === 'track_action') {
+          // Forward track actions for mobile gestures
+          broadcastToClients(wss, {
+            type: 'track_action',
+            data: data.data
+          });
+          
+          console.log(`Track action: ${data.data?.actionType} on track ${data.data?.trackId} (${data.data?.trackName})`);
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -67,8 +75,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Helper function to broadcast messages to all connected clients
   function broadcastToClients(server: WebSocketServer, data: any) {
+    const OPEN = 1; // WebSocket ready state constant for OPEN
     server.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
+      if (client.readyState === OPEN) {
         client.send(JSON.stringify(data));
       }
     });

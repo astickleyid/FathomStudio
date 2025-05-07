@@ -12,7 +12,7 @@ import TransportControls from '@/components/TransportControls';
 import StatusFooter from '@/components/StatusFooter';
 import AddTrackDialog from '@/components/AddTrackDialog';
 import { useToast } from '@/hooks/use-toast';
-import useWebSocket, { ReadyState } from '@/hooks/use-websocket';
+import { useWebSocket } from '@/hooks/use-websocket';
 import { useMobile } from '@/hooks/use-mobile';
 import { Project, Track } from '@shared/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +21,8 @@ export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [socket, setSocket] = useState<WebSocket | null>(null);
+  // No longer needed with the new WebSocket hook
+  // const [socket, setSocket] = useState<WebSocket | null>(null);
   const [mobileView, setMobileView] = useState<'tracks' | 'timeline' | 'mixer'>('timeline');
   const isMobile = useMobile();
   const { toast } = useToast();
@@ -103,28 +104,38 @@ export default function Home() {
   const wsUrl = currentProject ? `${protocol}//${window.location.host}/ws` : null;
 
   // Use our custom WebSocket hook
-  const { sendMessage, readyState, getWebSocket } = useWebSocket(
-    wsUrl || '', // Empty string when no URL is available
-    {
-      onOpen: handleWebSocketOpen,
-      onClose: handleWebSocketClose,
-      onMessage: handleWebSocketMessage,
-      shouldReconnect: !!currentProject, // Only reconnect if we have a project
-      reconnectInterval: 3000,
-      reconnectAttempts: 10,
-      pingInterval: 20000,
-    }
-  );
+  const { isConnected: wsConnected, sendMessage, lastMessage } = useWebSocket();
 
-  // Update socket ref whenever the WebSocket connection changes
+  // Update connection status from WebSocket hook
   useEffect(() => {
-    const ws = getWebSocket();
-    if (ws) {
-      setSocket(ws);
+    setIsConnected(wsConnected);
+    
+    // Handle incoming messages
+    if (lastMessage) {
+      console.log('WebSocket message received:', lastMessage);
+      
+      // Handle different message types
+      if (lastMessage.type === 'track_update' || lastMessage.type === 'track_created' || lastMessage.type === 'track_updated') {
+        toast({
+          title: 'Track Update',
+          description: `Track activity detected`,
+          duration: 2000,
+        });
+      } else if (lastMessage.type === 'ai_suggestion_created') {
+        toast({
+          title: 'New AI Suggestion',
+          description: lastMessage.data?.suggestion || 'New suggestion available',
+          duration: 4000,
+        });
+      } else if (lastMessage.type === 'connected') {
+        toast({
+          title: 'Connected to Fathom Studio',
+          description: 'Real-time audio collaboration is now active',
+          duration: 3000,
+        });
+      }
     }
-    // Update connection status based on readyState
-    setIsConnected(readyState === ReadyState.OPEN);
-  }, [getWebSocket, readyState]);
+  }, [wsConnected, lastMessage, toast]);
 
   const handleTrackSelect = (trackId: number) => {
     setSelectedTrack(trackId);
@@ -132,13 +143,16 @@ export default function Home() {
 
   const handleProcessAICommand = async (command: string) => {
     // Send the command to the server
-    if (readyState === ReadyState.OPEN) {
-      sendMessage(JSON.stringify({
+    if (wsConnected) {
+      sendMessage({
         type: 'ai_command',
-        command: command,
-        projectId: currentProject?.id,
-        trackId: selectedTrack
-      }));
+        message: command,
+        data: {
+          command: command,
+          projectId: currentProject?.id,
+          trackId: selectedTrack
+        }
+      });
     }
     
     try {
@@ -252,7 +266,7 @@ export default function Home() {
             
             <TransportControls 
               tempo={currentProject?.tempo || 120}
-              socket={socket}
+              socket={null} // No longer passing actual socket instance
             />
           </div>
         )}

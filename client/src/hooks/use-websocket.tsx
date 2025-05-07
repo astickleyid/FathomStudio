@@ -1,167 +1,143 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
-export enum ReadyState {
-  CONNECTING = 0,
-  OPEN = 1,
-  CLOSING = 2,
-  CLOSED = 3,
-}
+// WebSocket ready states
+const WS_READY_STATES = {
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSING: 2,
+  CLOSED: 3
+};
 
-export interface UseWebSocketOptions {
-  onOpen?: (event: WebSocketEventMap['open']) => void;
-  onClose?: (event: WebSocketEventMap['close']) => void;
-  onMessage?: (event: WebSocketEventMap['message']) => void;
-  onError?: (event: WebSocketEventMap['error']) => void;
-  reconnectInterval?: number;
-  reconnectAttempts?: number;
-  shouldReconnect?: boolean;
-  pingInterval?: number;
-  pingMessage?: string;
-}
+type WebSocketMessage = {
+  type: string;
+  message?: string;
+  data?: any;
+};
 
-export const useWebSocket = (
-  url: string,
-  {
-    onOpen,
-    onClose,
-    onMessage,
-    onError,
-    reconnectInterval = 5000,
-    reconnectAttempts = Infinity,
-    shouldReconnect = true,
-    pingInterval = 30000,
-    pingMessage = JSON.stringify({ type: 'ping' }),
-  }: UseWebSocketOptions = {}
-) => {
-  const [readyState, setReadyState] = useState<ReadyState>(ReadyState.CONNECTING);
-  const [lastMessage, setLastMessage] = useState<WebSocketEventMap['message'] | null>(null);
+export function useWebSocket() {
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
-  const pingTimeoutRef = useRef<number | null>(null);
-  const reconnectAttemptsRef = useRef(0);
 
+  // Create connection
   const connect = useCallback(() => {
-    // Clean up any existing socket
+    // Close any existing connection
     if (socketRef.current) {
       socketRef.current.close();
     }
 
-    // Clear any existing intervals/timeouts
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
+    // Determine the correct WebSocket URL based on the current protocol
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    // Create new WebSocket connection
+    const socket = new WebSocket(wsUrl);
+    socketRef.current = socket;
 
-    if (pingTimeoutRef.current) {
-      clearInterval(pingTimeoutRef.current);
-      pingTimeoutRef.current = null;
-    }
+    // Connection opened
+    socket.addEventListener('open', () => {
+      console.log('WebSocket connection established');
+      setIsConnected(true);
+      
+      // Clear any reconnect timeout
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    });
 
-    try {
-      // Create a new WebSocket connection
-      const ws = new WebSocket(url);
-      socketRef.current = ws;
-      setReadyState(ReadyState.CONNECTING);
-
-      // Setup event handlers
-      ws.onopen = (event) => {
-        console.log('WebSocket connection established');
-        setReadyState(ReadyState.OPEN);
-        reconnectAttemptsRef.current = 0;
+    // Listen for messages
+    socket.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('WebSocket message received:', data);
+        setLastMessage(data);
         
-        // Set up ping interval to keep connection alive
-        if (pingInterval > 0) {
-          pingTimeoutRef.current = window.setInterval(() => {
-            if (ws.readyState === 1) {
-              ws.send(pingMessage);
-              console.log('Ping sent');
-            }
-          }, pingInterval);
+        // Handle specific message types
+        if (data.type === 'connected') {
+          console.log('Connection acknowledged by server:', data.message);
+        } else if (data.type === 'pong') {
+          console.log('Received pong from server');
         }
-        
-        if (onOpen) {
-          onOpen(event);
-        }
-      };
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    });
 
-      ws.onclose = (event) => {
-        console.log('WebSocket connection closed');
-        setReadyState(ReadyState.CLOSED);
-        
-        // Clear ping interval
-        if (pingTimeoutRef.current) {
-          clearInterval(pingTimeoutRef.current);
-          pingTimeoutRef.current = null;
-        }
-        
-        if (onClose) {
-          onClose(event);
-        }
+    // Connection closed
+    socket.addEventListener('close', () => {
+      console.log('WebSocket connection closed');
+      setIsConnected(false);
+      
+      // Attempt to reconnect after a delay
+      reconnectTimeoutRef.current = window.setTimeout(() => {
+        connect();
+      }, 3000);
+    });
 
-        // Attempt to reconnect if enabled and under max attempts
-        if (shouldReconnect && reconnectAttemptsRef.current < reconnectAttempts) {
-          reconnectAttemptsRef.current += 1;
-          reconnectTimeoutRef.current = window.setTimeout(() => {
-            console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${reconnectAttempts})`);
-            connect();
-          }, reconnectInterval);
-        }
-      };
+    // Connection error
+    socket.addEventListener('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
 
-      ws.onmessage = (event) => {
-        setLastMessage(event);
-        if (onMessage) {
-          onMessage(event);
-        }
-      };
+    // Setup periodic ping to keep connection alive
+    const pingInterval = window.setInterval(() => {
+      if (socket.readyState === WS_READY_STATES.OPEN) {
+        console.log('Ping sent');
+        socket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 20000);
 
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event);
-        if (onError) {
-          onError(event);
-        }
-      };
-    } catch (error) {
-      console.error('Error creating WebSocket:', error);
-    }
-  }, [url, onOpen, onClose, onMessage, onError, reconnectInterval, reconnectAttempts, shouldReconnect, pingInterval, pingMessage]);
+    // Cleanup
+    return () => {
+      window.clearInterval(pingInterval);
+      if (reconnectTimeoutRef.current !== null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+      }
+      socket.close();
+    };
+  }, []);
 
-  // Send a message through the WebSocket
-  const sendMessage = useCallback((message: string | ArrayBufferLike | Blob | ArrayBufferView) => {
-    if (socketRef.current && socketRef.current.readyState === 1) {
-      socketRef.current.send(message);
+  // Initialize connection on mount
+  useEffect(() => {
+    const cleanup = connect();
+    
+    // Cleanup on component unmount
+    return () => {
+      cleanup();
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+    };
+  }, [connect]);
+
+  // Send message to WebSocket server
+  const sendMessage = useCallback((message: WebSocketMessage) => {
+    if (socketRef.current?.readyState === WS_READY_STATES.OPEN) {
+      socketRef.current.send(JSON.stringify(message));
       return true;
     }
     return false;
   }, []);
 
-  // Connect on initial render and when the URL changes
-  useEffect(() => {
-    connect();
-
-    // Clean up on unmount
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.close();
+  // Send a track action notification
+  const sendTrackAction = useCallback((actionType: string, trackId: number, trackName: string) => {
+    return sendMessage({
+      type: 'track_action',
+      data: {
+        actionType,
+        trackId,
+        trackName,
+        timestamp: new Date().toISOString()
       }
-      
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      
-      if (pingTimeoutRef.current) {
-        clearInterval(pingTimeoutRef.current);
-      }
-    };
-  }, [connect]);
+    });
+  }, [sendMessage]);
 
   return {
-    sendMessage,
+    isConnected,
     lastMessage,
-    readyState,
-    reconnect: connect,
-    getWebSocket: () => socketRef.current,
+    sendMessage,
+    sendTrackAction
   };
-};
-
-export default useWebSocket;
+}

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Volume2, 
@@ -13,7 +13,8 @@ import {
   MessageSquareText,
   Computer,
   MoveVertical,
-  FlipHorizontal
+  FlipHorizontal,
+  Wifi
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { audioEngine } from '@/lib/audio-engine';
@@ -24,6 +25,7 @@ import { Track as AudioTrack } from '@/lib/types';
 import { Track, TrackInsert } from '@shared/schema';
 import { useGestures } from '@/hooks/use-gestures';
 import { useMobile } from '@/hooks/use-mobile';
+import { useWebSocket } from '@/hooks/use-websocket';
 
 interface TrackListProps {
   tracks: Track[] | undefined;
@@ -49,6 +51,28 @@ export default function TrackList({
   const isMobile = useMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isConnected, sendTrackAction, lastMessage } = useWebSocket();
+  
+  // Handle incoming WebSocket messages - especially track_action messages from other clients
+  useEffect(() => {
+    if (lastMessage && lastMessage.type === 'track_action' && lastMessage.data) {
+      const { actionType, trackId, trackName } = lastMessage.data;
+      
+      // Show toast notification for actions from other users
+      toast({
+        title: `Remote track action`,
+        description: `${actionType} track "${trackName}" (ID: ${trackId})`,
+        duration: 2000,
+      });
+      
+      // Refresh track data to show the changes
+      if (tracks && tracks.length > 0) {
+        // Get project ID from first track
+        const projectId = tracks[0].projectId;
+        queryClient.invalidateQueries({ queryKey: ['/api/projects', projectId, 'tracks'] });
+      }
+    }
+  }, [lastMessage, toast, queryClient, tracks]);
   
   // Create a new track
   const handleCreateTrack = async () => {
@@ -300,6 +324,11 @@ export default function TrackList({
             // Use existing function but create a synthetic event
             await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
             
+            // Broadcast gesture action to other clients if connected
+            if (isConnected) {
+              sendTrackAction('mute', track.id, track.name);
+            }
+            
             // Show a visual feedback
             setTimeout(() => {
               setGestureTrackId(null);
@@ -322,6 +351,11 @@ export default function TrackList({
           if (track.isMuted) {
             // Use existing function but create a synthetic event
             await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+            
+            // Broadcast gesture action to other clients if connected
+            if (isConnected) {
+              sendTrackAction('unmute', track.id, track.name);
+            }
             
             // Show a visual feedback
             setTimeout(() => {
@@ -346,6 +380,11 @@ export default function TrackList({
             // Use existing function but create a synthetic event
             await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
             
+            // Broadcast gesture action to other clients if connected
+            if (isConnected) {
+              sendTrackAction('arm', track.id, track.name);
+            }
+            
             // Show a visual feedback
             setTimeout(() => {
               setGestureTrackId(null);
@@ -368,6 +407,11 @@ export default function TrackList({
           if (track.isArmed) {
             // Use existing function but create a synthetic event
             await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+            
+            // Broadcast gesture action to other clients if connected
+            if (isConnected) {
+              sendTrackAction('disarm', track.id, track.name);
+            }
             
             // Show a visual feedback
             setTimeout(() => {
@@ -405,7 +449,21 @@ export default function TrackList({
     return (
       <div className="flex-1 flex flex-col">
         <div className="p-3 border-b border-[#333333] flex justify-between items-center">
-          <h2 className="text-lg font-medium">Tracks</h2>
+          <div className="flex items-center gap-1">
+            <h2 className="text-lg font-medium">Tracks</h2>
+            {/* WebSocket connection indicator */}
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} transition-colors duration-300`} 
+              title={isConnected ? 'Realtime connected' : 'Realtime disconnected'} />
+          </div>
+          <div className="flex gap-2 items-center">
+            {isMobile && isConnected && (
+              <span className="text-xs text-[#666666] flex items-center" title="Realtime gestures enabled">
+                <Wifi className="w-3 h-3 mr-1 text-green-500" />
+                Live
+              </span>
+            )}
+            <div className="w-7 h-7"></div> {/* Placeholder for button */}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -419,13 +477,26 @@ export default function TrackList({
   return (
     <div className="flex-1 flex flex-col max-h-full">
       <div className="p-3 border-b border-[#333333] flex justify-between items-center">
-        <h2 className="text-lg font-medium">Tracks</h2>
-        <button 
-          onClick={() => setIsAddingTrack(!isAddingTrack)}
-          className="p-1.5 bg-[#252525] hover:bg-[#333333] rounded-full transition-colors"
-        >
-          <Plus className="w-4 h-4 text-white" />
-        </button>
+        <div className="flex items-center gap-1">
+          <h2 className="text-lg font-medium">Tracks</h2>
+          {/* WebSocket connection indicator */}
+          <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} transition-colors duration-300`} 
+            title={isConnected ? 'Realtime connected' : 'Realtime disconnected'} />
+        </div>
+        <div className="flex gap-2 items-center">
+          {isMobile && isConnected && (
+            <span className="text-xs text-[#666666] flex items-center" title="Realtime gestures enabled">
+              <Wifi className="w-3 h-3 mr-1 text-green-500" />
+              Live
+            </span>
+          )}
+          <button 
+            onClick={() => setIsAddingTrack(!isAddingTrack)}
+            className="p-1.5 bg-[#252525] hover:bg-[#333333] rounded-full transition-colors"
+          >
+            <Plus className="w-4 h-4 text-white" />
+          </button>
+        </div>
       </div>
       
       {/* Add Track Form */}
@@ -481,20 +552,55 @@ export default function TrackList({
       )}
       
       {/* Track List */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      <div className="flex-1 overflow-y-auto p-2 space-y-1" ref={trackListRef}>
         {tracks && tracks.length > 0 ? (
           tracks.map((track) => (
             <div 
               key={track.id}
+              ref={(el) => {
+                if (el) trackRefs.current[track.id] = el;
+                // Initialize gesture handling for this track
+                handleGestureForTrack(track.id);
+              }}
               className={`flex flex-col rounded-md cursor-pointer transition-colors ${
                 selectedTrackId === track.id 
                   ? 'bg-[#252525]' 
                   : 'hover:bg-[#1A1A1A]'
+              } ${
+                gestureTrackId === track.id
+                  ? gestureState === 'swipe-left'
+                    ? 'animate-slide-left bg-orange-950/20'
+                    : gestureState === 'swipe-right'
+                    ? 'animate-slide-right bg-green-950/20'
+                    : gestureState === 'swipe-up'
+                    ? 'animate-slide-up bg-red-950/20'
+                    : gestureState === 'swipe-down'
+                    ? 'animate-slide-down bg-blue-950/20'
+                    : 'bg-zinc-800/50'
+                  : ''
               }`}
               onClick={() => onSelectTrack(track.id)}
             >
+              {/* Gesture Indicator (mobile only) */}
+              {isMobile && gestureTrackId === track.id && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                  {gestureState === 'swipe-left' && (
+                    <VolumeX className="w-8 h-8 text-[#FF7A00] animate-pulse" />
+                  )}
+                  {gestureState === 'swipe-right' && (
+                    <Volume2 className="w-8 h-8 text-green-500 animate-pulse" />
+                  )}
+                  {gestureState === 'swipe-up' && (
+                    <Mic className="w-8 h-8 text-red-500 animate-pulse" />
+                  )}
+                  {gestureState === 'swipe-down' && (
+                    <Mic className="w-8 h-8 text-blue-500 animate-pulse" />
+                  )}
+                </div>
+              )}
+              
               {/* Main Track Row */}
-              <div className="flex items-center p-2">
+              <div className="flex items-center p-2 relative">
                 {/* Track Color and Type Icon */}
                 <div 
                   className="w-7 h-7 flex items-center justify-center rounded-md text-white mr-2"
@@ -506,7 +612,15 @@ export default function TrackList({
                 {/* Track Name */}
                 <div className="flex-1 truncate">
                   <div className="text-sm font-medium text-white">{track.name}</div>
-                  <div className="text-xs text-[#999999]">{track.type}</div>
+                  <div className="text-xs text-[#999999] flex items-center">
+                    {track.type}
+                    {isMobile && (
+                      <span className="ml-2 text-xs text-[#666666] flex items-center" title="Mobile gesture controls enabled">
+                        <FlipHorizontal className="w-3 h-3 mr-1" />
+                        Swipe for actions
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 {/* Track Controls */}
