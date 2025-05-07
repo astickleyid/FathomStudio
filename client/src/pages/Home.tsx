@@ -16,11 +16,13 @@ import { useWebSocket } from '@/hooks/use-websocket';
 import { useMobile } from '@/hooks/use-mobile';
 import { Project, Track } from '@shared/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronDown, Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<number | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isAIAssistantOpen, setIsAIAssistantOpen] = useState(false);
   // No longer needed with the new WebSocket hook
   // const [socket, setSocket] = useState<WebSocket | null>(null);
   const [mobileView, setMobileView] = useState<'tracks' | 'timeline' | 'mixer'>('timeline');
@@ -42,6 +44,8 @@ export default function Home() {
   useEffect(() => {
     if (project) {
       setCurrentProject(project);
+      // Open AI assistant when we have a project
+      setIsAIAssistantOpen(true);
     }
   }, [project]);
 
@@ -308,18 +312,35 @@ export default function Home() {
         )}
       </div>
       
-      {/* Fixed AI Command Interface */}
-      <div className={`fixed bottom-28 left-1/2 transform -translate-x-1/2 ${isMobile ? 'w-[90%]' : 'w-96'} z-50`}>
-        <div className="bg-[#1A1A1A] border border-[#333333] rounded-md shadow-xl">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-[#252525] border-b border-[#333333]">
-            <h3 className="text-sm font-medium">AI Assistant</h3>
+      {/* Collapsible AI Command Interface */}
+      <div className={`fixed bottom-28 ${isAIAssistantOpen ? 'left-1/2 transform -translate-x-1/2' : 'right-4'} ${isAIAssistantOpen ? (isMobile ? 'w-[90%]' : 'w-96') : 'w-auto'} z-50 transition-all duration-300`}>
+        {isAIAssistantOpen ? (
+          <div className="bg-[#1A1A1A] border border-[#333333] rounded-md shadow-xl">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-[#252525] border-b border-[#333333]">
+              <h3 className="text-sm font-medium">AI Assistant {currentProject ? `- ${currentProject.name}` : '(No Project Selected)'}</h3>
+              <button 
+                onClick={() => setIsAIAssistantOpen(false)}
+                className="p-1 hover:bg-[#333333] rounded-full transition-colors"
+                title="Minimize Assistant"
+              >
+                <ChevronDown className="w-4 h-4 text-[#999999]" />
+              </button>
+            </div>
+            <AICommandInterface 
+              onProcessCommand={handleProcessAICommand}
+              isConnected={isConnected}
+              projectId={currentProject?.id}
+            />
           </div>
-          <AICommandInterface 
-            onProcessCommand={handleProcessAICommand}
-            isConnected={isConnected}
-            projectId={currentProject?.id}
-          />
-        </div>
+        ) : (
+          <button 
+            onClick={() => setIsAIAssistantOpen(true)}
+            className="p-3 bg-[#FF7A00] hover:bg-[#CC6200] rounded-full shadow-lg flex items-center justify-center transition-all duration-300"
+            title="Open AI Assistant"
+          >
+            <Sparkles className="w-5 h-5 text-white" />
+          </button>
+        )}
       </div>
       
       {/* Add Track Button (Floating) */}

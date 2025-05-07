@@ -4,8 +4,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Save, Settings, User, ChevronDown, Home, Plus, 
   FileAudio, Music, Volume2, FileText, X, 
-  Waves, Play, Pause, Download, Menu
+  Waves, Play, Pause, Download, Menu, FolderOpen, HardDrive
 } from 'lucide-react';
+import AudioSettings from './AudioSettings';
+import SaveProjectDialog from './SaveProjectDialog';
 import { Link } from 'wouter';
 import { useMobile } from '@/hooks/use-mobile';
 
@@ -22,6 +24,9 @@ export default function MainHeader({ project, isLoading }: MainHeaderProps) {
   const [tempo, setTempo] = useState<number>(project?.tempo || 120);
   const [timeSignature, setTimeSignature] = useState<string>(project?.timeSignature || "4/4");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveDialogAction, setSaveDialogAction] = useState<'save' | 'save-as' | 'open' | 'new'>('save');
   const isMobile = useMobile();
   
   // Update tempo and time signature if project changes
