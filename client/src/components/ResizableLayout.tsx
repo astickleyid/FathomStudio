@@ -151,28 +151,35 @@ export const ResizableLayout = ({
   direction = 'horizontal',
   className
 }: ResizableLayoutProps) => {
+  // Convert children to array for processing
+  const childrenArray = React.Children.toArray(children).filter(
+    child => React.isValidElement(child)
+  ) as React.ReactElement[];
+  
   return (
     <ResizablePanelGroup 
       direction={direction} 
       className={cn("h-full", className)}
     >
-      {React.Children.map(children, (child, index) => {
-        if (!React.isValidElement(child)) return null;
+      {childrenArray.map((child, index) => {
+        const isLastChild = index === childrenArray.length - 1;
         
-        const isLastChild = index === React.Children.count(children) - 1;
+        // Calculate default size evenly if not specified
+        const defaultSize = child.props.defaultSize || 100 / childrenArray.length;
+        const minSize = child.props.minSize || 10;
         
         return (
-          <>
+          <React.Fragment key={child.props.id || index}>
             <ResizablePanel 
-              defaultSize={child.props.defaultSize || 100 / React.Children.count(children)}
-              minSize={child.props.minSize || 10}
+              defaultSize={defaultSize}
+              minSize={minSize}
               className="overflow-hidden"
             >
               {child}
             </ResizablePanel>
             
             {!isLastChild && <ResizableHandle withHandle />}
-          </>
+          </React.Fragment>
         );
       })}
     </ResizablePanelGroup>
