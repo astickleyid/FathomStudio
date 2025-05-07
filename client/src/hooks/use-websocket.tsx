@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 // WebSocket ready states
 const WS_READY_STATES = {
@@ -8,51 +8,70 @@ const WS_READY_STATES = {
   CLOSED: 3
 };
 
-type WebSocketMessage = {
+export type WebSocketMessage = {
   type: string;
   message?: string;
   data?: any;
 };
 
-export function useWebSocket() {
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
-  const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-
-  // Create connection
-  const connect = useCallback(() => {
-    // Close any existing connection
-    if (socketRef.current) {
-      socketRef.current.close();
+// Create a singleton WebSocket instance
+class WebSocketManager {
+  private static instance: WebSocketManager;
+  private socket: WebSocket | null = null;
+  private reconnectTimeout: number | null = null;
+  private pingInterval: number | null = null;
+  private listeners: Set<(message: WebSocketMessage) => void> = new Set();
+  private statusListeners: Set<(connected: boolean) => void> = new Set();
+  
+  private constructor() {
+    // Initialize the connection
+    this.connect();
+  }
+  
+  public static getInstance(): WebSocketManager {
+    if (!WebSocketManager.instance) {
+      WebSocketManager.instance = new WebSocketManager();
     }
-
+    return WebSocketManager.instance;
+  }
+  
+  // Connect to the WebSocket server
+  private connect(): void {
+    // Close existing connection if any
+    if (this.socket) {
+      this.socket.close();
+    }
+    
     // Determine the correct WebSocket URL based on the current protocol
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
     
     // Create new WebSocket connection
-    const socket = new WebSocket(wsUrl);
-    socketRef.current = socket;
-
+    this.socket = new WebSocket(wsUrl);
+    
     // Connection opened
-    socket.addEventListener('open', () => {
+    this.socket.addEventListener('open', () => {
       console.log('WebSocket connection established');
-      setIsConnected(true);
+      this.notifyStatusChange(true);
       
       // Clear any reconnect timeout
-      if (reconnectTimeoutRef.current !== null) {
-        window.clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
+      if (this.reconnectTimeout !== null) {
+        window.clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
       }
+      
+      // Setup periodic ping to keep connection alive
+      this.setupPing();
     });
-
+    
     // Listen for messages
-    socket.addEventListener('message', (event) => {
+    this.socket.addEventListener('message', (event) => {
       try {
         const data = JSON.parse(event.data);
         console.log('WebSocket message received:', data);
-        setLastMessage(data);
+        
+        // Notify all listeners of the message
+        this.notifyMessage(data);
         
         // Handle specific message types
         if (data.type === 'connected') {
@@ -64,63 +83,141 @@ export function useWebSocket() {
         console.error('Error parsing WebSocket message:', error);
       }
     });
-
+    
     // Connection closed
-    socket.addEventListener('close', () => {
+    this.socket.addEventListener('close', () => {
       console.log('WebSocket connection closed');
-      setIsConnected(false);
+      this.notifyStatusChange(false);
+      
+      // Clear the ping interval
+      if (this.pingInterval !== null) {
+        window.clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
       
       // Attempt to reconnect after a delay
-      reconnectTimeoutRef.current = window.setTimeout(() => {
-        connect();
+      this.reconnectTimeout = window.setTimeout(() => {
+        this.connect();
       }, 3000);
     });
-
+    
     // Connection error
-    socket.addEventListener('error', (error) => {
+    this.socket.addEventListener('error', (error) => {
       console.error('WebSocket error:', error);
     });
-
-    // Setup periodic ping to keep connection alive
-    const pingInterval = window.setInterval(() => {
-      if (socket.readyState === WS_READY_STATES.OPEN) {
+  }
+  
+  // Setup periodic ping to keep connection alive
+  private setupPing(): void {
+    // Clear any existing ping interval
+    if (this.pingInterval !== null) {
+      window.clearInterval(this.pingInterval);
+    }
+    
+    // Setup a new ping interval
+    this.pingInterval = window.setInterval(() => {
+      if (this.socket && this.socket.readyState === WS_READY_STATES.OPEN) {
         console.log('Ping sent');
-        socket.send(JSON.stringify({ type: 'ping' }));
+        this.socket.send(JSON.stringify({ type: 'ping' }));
       }
     }, 20000);
-
-    // Cleanup
-    return () => {
-      window.clearInterval(pingInterval);
-      if (reconnectTimeoutRef.current !== null) {
-        window.clearTimeout(reconnectTimeoutRef.current);
-      }
-      socket.close();
-    };
-  }, []);
-
-  // Initialize connection on mount
-  useEffect(() => {
-    const cleanup = connect();
-    
-    // Cleanup on component unmount
-    return () => {
-      cleanup();
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-    };
-  }, [connect]);
-
-  // Send message to WebSocket server
-  const sendMessage = useCallback((message: WebSocketMessage) => {
-    if (socketRef.current?.readyState === WS_READY_STATES.OPEN) {
-      socketRef.current.send(JSON.stringify(message));
+  }
+  
+  // Send a message to the WebSocket server
+  public sendMessage(message: WebSocketMessage): boolean {
+    if (this.socket && this.socket.readyState === WS_READY_STATES.OPEN) {
+      this.socket.send(JSON.stringify(message));
       return true;
     }
     return false;
-  }, []);
+  }
+  
+  // Add a message listener
+  public addMessageListener(listener: (message: WebSocketMessage) => void): void {
+    this.listeners.add(listener);
+  }
+  
+  // Remove a message listener
+  public removeMessageListener(listener: (message: WebSocketMessage) => void): void {
+    this.listeners.delete(listener);
+  }
+  
+  // Add a status change listener
+  public addStatusListener(listener: (connected: boolean) => void): void {
+    this.statusListeners.add(listener);
+    // Immediately notify the listener of the current connection status
+    if (this.socket) {
+      listener(this.socket.readyState === WS_READY_STATES.OPEN);
+    } else {
+      listener(false);
+    }
+  }
+  
+  // Remove a status change listener
+  public removeStatusListener(listener: (connected: boolean) => void): void {
+    this.statusListeners.delete(listener);
+  }
+  
+  // Notify all message listeners of a new message
+  private notifyMessage(message: WebSocketMessage): void {
+    this.listeners.forEach(listener => {
+      try {
+        listener(message);
+      } catch (error) {
+        console.error('Error in WebSocket message listener:', error);
+      }
+    });
+  }
+  
+  // Notify all status listeners of a connection status change
+  private notifyStatusChange(connected: boolean): void {
+    this.statusListeners.forEach(listener => {
+      try {
+        listener(connected);
+      } catch (error) {
+        console.error('Error in WebSocket status listener:', error);
+      }
+    });
+  }
+  
+  // Check if the WebSocket is connected
+  public isConnected(): boolean {
+    return this.socket !== null && this.socket.readyState === WS_READY_STATES.OPEN;
+  }
+}
 
+// React hook for using the WebSocket
+export function useWebSocket() {
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
+  const webSocketManager = WebSocketManager.getInstance();
+  
+  // Handle WebSocket messages
+  useEffect(() => {
+    const handleMessage = (message: WebSocketMessage) => {
+      setLastMessage(message);
+    };
+    
+    const handleStatus = (connected: boolean) => {
+      setIsConnected(connected);
+    };
+    
+    // Add listeners
+    webSocketManager.addMessageListener(handleMessage);
+    webSocketManager.addStatusListener(handleStatus);
+    
+    // Remove listeners on cleanup
+    return () => {
+      webSocketManager.removeMessageListener(handleMessage);
+      webSocketManager.removeStatusListener(handleStatus);
+    };
+  }, []);
+  
+  // Send message to WebSocket server
+  const sendMessage = useCallback((message: WebSocketMessage) => {
+    return webSocketManager.sendMessage(message);
+  }, [webSocketManager]);
+  
   // Send a track action notification
   const sendTrackAction = useCallback((actionType: string, trackId: number, trackName: string) => {
     return sendMessage({
@@ -133,7 +230,7 @@ export function useWebSocket() {
       }
     });
   }, [sendMessage]);
-
+  
   return {
     isConnected,
     lastMessage,
