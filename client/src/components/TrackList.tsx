@@ -30,7 +30,7 @@ import { useWebSocket } from '@/hooks/use-websocket';
 interface TrackListProps {
   tracks: Track[] | undefined;
   isLoading: boolean;
-  selectedTrackId: number | null;
+  selectedTrackId: number | undefined;
   onSelectTrack: (trackId: number) => void;
 }
 
@@ -313,148 +313,173 @@ export default function TrackList({
     }
   };
   
-  // Handle track gestures
-  const handleGestureForTrack = (trackId: number) => {
+  // Setup gesture handlers for a track
+  const setupTrackGestures = (trackId: number, trackRef: HTMLDivElement | null) => {
+    if (!trackRef || !isMobile) return;
+    
     // Find the track
     const track = tracks?.find(t => t.id === trackId);
     if (!track) return;
     
-    // Setup gesture handlers
+    // Configure gesture handlers
+    return {
+      onSwipeLeft: async () => {
+        setGestureTrackId(trackId);
+        setGestureState('swipe-left');
+        
+        // Mute the track if it's not already muted
+        if (!track.isMuted) {
+          // Use existing function but create a synthetic event
+          await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('mute', track.id, track.name);
+          }
+          
+          // Show a visual feedback
+          setTimeout(() => {
+            setGestureTrackId(null);
+            setGestureState(null);
+          }, 500);
+          
+          // Show toast notification
+          toast({
+            title: "Track Muted",
+            description: `Track "${track.name}" muted (swipe right to unmute)`,
+            duration: 2000,
+          });
+        }
+      },
+      onSwipeRight: async () => {
+        setGestureTrackId(trackId);
+        setGestureState('swipe-right');
+        
+        // Unmute the track if it's muted
+        if (track.isMuted) {
+          // Use existing function but create a synthetic event
+          await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('unmute', track.id, track.name);
+          }
+          
+          // Show a visual feedback
+          setTimeout(() => {
+            setGestureTrackId(null);
+            setGestureState(null);
+          }, 500);
+          
+          // Show toast notification
+          toast({
+            title: "Track Unmuted",
+            description: `Track "${track.name}" unmuted`,
+            duration: 2000,
+          });
+        }
+      },
+      onSwipeUp: async () => {
+        setGestureTrackId(trackId);
+        setGestureState('swipe-up');
+        
+        // Arm the track if it's not already armed
+        if (!track.isArmed) {
+          // Use existing function but create a synthetic event
+          await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('arm', track.id, track.name);
+          }
+          
+          // Show a visual feedback
+          setTimeout(() => {
+            setGestureTrackId(null);
+            setGestureState(null);
+          }, 500);
+          
+          // Show toast notification
+          toast({
+            title: "Track Armed",
+            description: `Track "${track.name}" armed for recording (swipe down to disarm)`,
+            duration: 2000,
+          });
+        }
+      },
+      onSwipeDown: async () => {
+        setGestureTrackId(trackId);
+        setGestureState('swipe-down');
+        
+        // Disarm the track if it's armed
+        if (track.isArmed) {
+          // Use existing function but create a synthetic event
+          await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('disarm', track.id, track.name);
+          }
+          
+          // Show a visual feedback
+          setTimeout(() => {
+            setGestureTrackId(null);
+            setGestureState(null);
+          }, 500);
+          
+          // Show toast notification
+          toast({
+            title: "Track Disarmed",
+            description: `Track "${track.name}" disarmed`,
+            duration: 2000,
+          });
+        }
+      },
+      onTap: () => {
+        // Select the track
+        onSelectTrack(trackId);
+      },
+      // Show visual feedback during gestures
+      onGestureStart: () => {
+        setGestureTrackId(trackId);
+      },
+      onGestureEnd: () => {
+        // Only reset if there's no active gesture state
+        if (!gestureState) {
+          setGestureTrackId(null);
+        }
+      }
+    };
+  };
+  
+  // Apply gestures to a track element
+  const handleGestureForTrack = (trackId: number) => {
     const trackRef = trackRefs.current[trackId];
     if (!trackRef || !isMobile) return;
     
-    // Use our custom gesture hook
-    useGestures(
-      { current: trackRef },
-      {
-        onSwipeLeft: async () => {
-          setGestureTrackId(trackId);
-          setGestureState('swipe-left');
-          
-          // Mute the track if it's not already muted
-          if (!track.isMuted) {
-            // Use existing function but create a synthetic event
-            await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
-            
-            // Broadcast gesture action to other clients if connected
-            if (isConnected) {
-              sendTrackAction('mute', track.id, track.name);
-            }
-            
-            // Show a visual feedback
-            setTimeout(() => {
-              setGestureTrackId(null);
-              setGestureState(null);
-            }, 500);
-            
-            // Show toast notification
-            toast({
-              title: "Track Muted",
-              description: `Track "${track.name}" muted (swipe right to unmute)`,
-              duration: 2000,
-            });
-          }
-        },
-        onSwipeRight: async () => {
-          setGestureTrackId(trackId);
-          setGestureState('swipe-right');
-          
-          // Unmute the track if it's muted
-          if (track.isMuted) {
-            // Use existing function but create a synthetic event
-            await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
-            
-            // Broadcast gesture action to other clients if connected
-            if (isConnected) {
-              sendTrackAction('unmute', track.id, track.name);
-            }
-            
-            // Show a visual feedback
-            setTimeout(() => {
-              setGestureTrackId(null);
-              setGestureState(null);
-            }, 500);
-            
-            // Show toast notification
-            toast({
-              title: "Track Unmuted",
-              description: `Track "${track.name}" unmuted`,
-              duration: 2000,
-            });
-          }
-        },
-        onSwipeUp: async () => {
-          setGestureTrackId(trackId);
-          setGestureState('swipe-up');
-          
-          // Arm the track if it's not already armed
-          if (!track.isArmed) {
-            // Use existing function but create a synthetic event
-            await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
-            
-            // Broadcast gesture action to other clients if connected
-            if (isConnected) {
-              sendTrackAction('arm', track.id, track.name);
-            }
-            
-            // Show a visual feedback
-            setTimeout(() => {
-              setGestureTrackId(null);
-              setGestureState(null);
-            }, 500);
-            
-            // Show toast notification
-            toast({
-              title: "Track Armed",
-              description: `Track "${track.name}" armed for recording (swipe down to disarm)`,
-              duration: 2000,
-            });
-          }
-        },
-        onSwipeDown: async () => {
-          setGestureTrackId(trackId);
-          setGestureState('swipe-down');
-          
-          // Disarm the track if it's armed
-          if (track.isArmed) {
-            // Use existing function but create a synthetic event
-            await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
-            
-            // Broadcast gesture action to other clients if connected
-            if (isConnected) {
-              sendTrackAction('disarm', track.id, track.name);
-            }
-            
-            // Show a visual feedback
-            setTimeout(() => {
-              setGestureTrackId(null);
-              setGestureState(null);
-            }, 500);
-            
-            // Show toast notification
-            toast({
-              title: "Track Disarmed",
-              description: `Track "${track.name}" disarmed`,
-              duration: 2000,
-            });
-          }
-        },
-        onTap: () => {
-          // Select the track
-          onSelectTrack(trackId);
-        },
-        // Show visual feedback during gestures
-        onGestureStart: () => {
-          setGestureTrackId(trackId);
-        },
-        onGestureEnd: () => {
-          // Only reset if there's no active gesture state
-          if (!gestureState) {
-            setGestureTrackId(null);
-          }
-        }
-      }
-    );
+    const gestureHandlers = setupTrackGestures(trackId, trackRef);
+    if (!gestureHandlers) return;
+    
+    // Create custom event handlers directly instead of using the hook
+    const touchStartHandler = (e: TouchEvent) => {
+      // Handle touch start (simplified version)
+      console.log('Touch start on track:', trackId);
+    };
+    
+    const touchEndHandler = (e: TouchEvent) => {
+      // On touchend, handle tap gesture manually
+      onSelectTrack(trackId);
+    };
+    
+    // Add simple event listeners
+    trackRef.addEventListener('touchstart', touchStartHandler);
+    trackRef.addEventListener('touchend', touchEndHandler);
+    
+    // Return cleanup function (not currently used, but good practice)
+    return () => {
+      trackRef.removeEventListener('touchstart', touchStartHandler);
+      trackRef.removeEventListener('touchend', touchEndHandler);
+    };
   };
   
   if (isLoading) {

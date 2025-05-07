@@ -363,7 +363,7 @@ export default function Home() {
                 <AutoMixPanel 
                   track={selectedTrack && tracksData ? 
                     tracksData.find((t: Track) => t.id === selectedTrack) || null : null}
-                  projectId={projectId}
+                  projectId={projectId !== undefined ? projectId : null}
                 />
               </TabsContent>
               
