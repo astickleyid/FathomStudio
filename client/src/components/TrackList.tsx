@@ -23,8 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Track } from '@/lib/types';
 import { Track as DbTrack, TrackInsert } from '@shared/schema';
-import { useGestures } from '@/hooks/use-gestures';
-import { useMobile } from '@/hooks/use-mobile';
+import { useMobile, useTrackGestures } from '@/hooks/use-mobile';
 import { useWebSocket } from '@/hooks/use-websocket';
 
 interface TrackListProps {
@@ -452,34 +451,165 @@ export default function TrackList({
     };
   };
   
-  // Apply gestures to a track element
-  const handleGestureForTrack = (trackId: number) => {
-    const trackRef = trackRefs.current[trackId];
-    if (!trackRef || !isMobile) return;
+  // Create a component to handle track gestures using our hook
+  const TrackWithGestures = ({ 
+    track, 
+    isSelected, 
+    children 
+  }: { 
+    track: Track, 
+    isSelected: boolean, 
+    children: React.ReactNode 
+  }) => {
+    const trackRef = useRef<HTMLDivElement>(null);
     
-    const gestureHandlers = setupTrackGestures(trackId, trackRef);
-    if (!gestureHandlers) return;
-    
-    // Create custom event handlers directly instead of using the hook
-    const touchStartHandler = (e: TouchEvent) => {
-      // Handle touch start (simplified version)
-      console.log('Touch start on track:', trackId);
+    // Set up gesture handlers for the track
+    const gestureHandlers = {
+      onTap: () => onSelectTrack(track.id),
+      onSwipeLeft: async () => {
+        setGestureTrackId(track.id);
+        setGestureState('swipe-left');
+        
+        // Mute the track if it's not already muted
+        if (!track.isMuted) {
+          // Use existing function but create a synthetic event
+          await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('mute', track.id, track.name);
+          }
+          
+          // Show toast notification
+          toast({
+            title: "Track Muted",
+            description: `Track "${track.name}" muted (swipe right to unmute)`,
+            duration: 2000,
+          });
+        }
+      },
+      onSwipeRight: async () => {
+        setGestureTrackId(track.id);
+        setGestureState('swipe-right');
+        
+        // Unmute the track if it's muted
+        if (track.isMuted) {
+          // Use existing function but create a synthetic event
+          await handleToggleMute(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('unmute', track.id, track.name);
+          }
+          
+          // Show toast notification
+          toast({
+            title: "Track Unmuted",
+            description: `Track "${track.name}" unmuted`,
+            duration: 2000,
+          });
+        }
+      },
+      onSwipeUp: async () => {
+        setGestureTrackId(track.id);
+        setGestureState('swipe-up');
+        
+        // Arm the track if it's not already armed
+        if (!track.isArmed) {
+          // Use existing function but create a synthetic event
+          await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('arm', track.id, track.name);
+          }
+          
+          // Show toast notification
+          toast({
+            title: "Track Armed",
+            description: `Track "${track.name}" armed for recording (swipe down to disarm)`,
+            duration: 2000,
+          });
+        }
+      },
+      onSwipeDown: async () => {
+        setGestureTrackId(track.id);
+        setGestureState('swipe-down');
+        
+        // Disarm the track if it's armed
+        if (track.isArmed) {
+          // Use existing function but create a synthetic event
+          await handleToggleArm(track, { stopPropagation: () => {} } as unknown as React.MouseEvent);
+          
+          // Broadcast gesture action to other clients if connected
+          if (isConnected) {
+            sendTrackAction('disarm', track.id, track.name);
+          }
+          
+          // Show toast notification
+          toast({
+            title: "Track Disarmed",
+            description: `Track "${track.name}" disarmed`,
+            duration: 2000,
+          });
+        }
+      }
     };
     
-    const touchEndHandler = (e: TouchEvent) => {
-      // On touchend, handle tap gesture manually
-      onSelectTrack(trackId);
-    };
+    // Use our custom hook to handle gestures
+    const { gestureState: trackGestureState } = useTrackGestures(trackRef, track.id, gestureHandlers);
     
-    // Add simple event listeners
-    trackRef.addEventListener('touchstart', touchStartHandler);
-    trackRef.addEventListener('touchend', touchEndHandler);
+    // Update parent component's state when gesture happens
+    useEffect(() => {
+      if (trackGestureState) {
+        setGestureState(trackGestureState);
+        setGestureTrackId(track.id);
+      } else {
+        // Only reset if this track was the one with gesture
+        if (gestureTrackId === track.id) {
+          setGestureState(null);
+          setGestureTrackId(null);
+        }
+      }
+    }, [trackGestureState, track.id]);
     
-    // Return cleanup function (not currently used, but good practice)
-    return () => {
-      trackRef.removeEventListener('touchstart', touchStartHandler);
-      trackRef.removeEventListener('touchend', touchEndHandler);
-    };
+    // Store the ref in the parent's trackRefs for other uses
+    useEffect(() => {
+      if (trackRef.current) {
+        trackRefs.current[track.id] = trackRef.current;
+      }
+      
+      return () => {
+        // Clean up on unmount
+        delete trackRefs.current[track.id];
+      };
+    }, [track.id]);
+    
+    return (
+      <div 
+        ref={trackRef}
+        className={`flex flex-col rounded-md cursor-pointer transition-colors ${
+          isSelected 
+            ? 'bg-[#252525]' 
+            : 'hover:bg-[#1A1A1A]'
+        } ${
+          gestureTrackId === track.id
+            ? gestureState === 'swipe-left'
+              ? 'animate-slide-left bg-orange-950/20'
+              : gestureState === 'swipe-right'
+              ? 'animate-slide-right bg-green-950/20'
+              : gestureState === 'swipe-up'
+              ? 'animate-slide-up bg-red-950/20'
+              : gestureState === 'swipe-down'
+              ? 'animate-slide-down bg-blue-950/20'
+              : 'bg-zinc-800/50'
+            : ''
+        }`}
+        onClick={() => onSelectTrack(track.id)}
+      >
+        {children}
+      </div>
+    );
   };
   
   if (isLoading) {
@@ -564,31 +694,10 @@ export default function TrackList({
       <div className="flex-1 overflow-y-auto p-2 space-y-1" ref={trackListRef}>
         {tracks && tracks.length > 0 ? (
           tracks.map((track) => (
-            <div 
+            <TrackWithGestures 
               key={track.id}
-              ref={(el) => {
-                if (el) trackRefs.current[track.id] = el;
-                // Initialize gesture handling for this track
-                handleGestureForTrack(track.id);
-              }}
-              className={`flex flex-col rounded-md cursor-pointer transition-colors ${
-                selectedTrackId === track.id 
-                  ? 'bg-[#252525]' 
-                  : 'hover:bg-[#1A1A1A]'
-              } ${
-                gestureTrackId === track.id
-                  ? gestureState === 'swipe-left'
-                    ? 'animate-slide-left bg-orange-950/20'
-                    : gestureState === 'swipe-right'
-                    ? 'animate-slide-right bg-green-950/20'
-                    : gestureState === 'swipe-up'
-                    ? 'animate-slide-up bg-red-950/20'
-                    : gestureState === 'swipe-down'
-                    ? 'animate-slide-down bg-blue-950/20'
-                    : 'bg-zinc-800/50'
-                  : ''
-              }`}
-              onClick={() => onSelectTrack(track.id)}
+              track={track}
+              isSelected={selectedTrackId === track.id}
             >
               {/* Gesture Indicator (mobile only) */}
               {isMobile && gestureTrackId === track.id && (
@@ -793,7 +902,7 @@ export default function TrackList({
                   </div>
                 </div>
               )}
-            </div>
+            </TrackWithGestures>
           ))
         ) : (
           <div className="flex flex-col items-center justify-center h-40 text-[#999999]">
