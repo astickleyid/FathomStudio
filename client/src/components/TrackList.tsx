@@ -492,7 +492,8 @@ export default function TrackList({
           )}
           <button 
             onClick={() => setIsAddingTrack(!isAddingTrack)}
-            className="p-1.5 bg-[#252525] hover:bg-[#333333] rounded-full transition-colors"
+            className="p-1.5 bg-[#FF7A00] hover:bg-[#CC6200] rounded-full transition-colors"
+            title="Add New Track"
           >
             <Plus className="w-4 h-4 text-white" />
           </button>
@@ -790,7 +791,7 @@ export default function TrackList({
           <div className="flex flex-col items-center justify-center h-40 text-[#999999]">
             <p className="mb-2">No tracks yet</p>
             <button 
-              className="px-3 py-1.5 text-sm bg-[#FF7A00] rounded-md text-white hover:bg-[#CC6200] flex items-center"
+              className="px-3 py-1.5 text-sm bg-[#FF7A00] rounded-md text-white hover:bg-[#CC6200] flex items-center shadow-lg"
               onClick={() => setIsAddingTrack(true)}
             >
               <Plus className="w-4 h-4 mr-1.5" />
