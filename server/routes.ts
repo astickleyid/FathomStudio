@@ -581,5 +581,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // AI Sound Generation API
+  app.post('/api/ai/generate-sound', async (req: Request, res: Response) => {
+    try {
+      const { prompt, parameters, soundType, presetId, projectId } = req.body;
+      
+      // Validate input
+      if (!parameters) {
+        return res.status(400).json({ 
+          error: 'Sound parameters are required'
+        });
+      }
+      
+      if (!soundType) {
+        return res.status(400).json({ 
+          error: 'Sound type is required'
+        });
+      }
+      
+      // If AI is enabled but no prompt provided, return error
+      if (parameters.useAI && !prompt) {
+        return res.status(400).json({ 
+          error: 'A prompt is required when AI is enabled'
+        });
+      }
+      
+      // Generate the sound
+      const result = await aiSoundService.generateSound(
+        prompt || '', 
+        parameters, 
+        soundType, 
+        presetId || 'default',
+        projectId ? parseInt(projectId) : undefined
+      );
+      
+      // Broadcast to connected clients
+      broadcastToClients(wss, {
+        type: 'sound_generated',
+        data: {
+          soundUrl: result.soundUrl,
+          prompt,
+          soundType,
+          parameters
+        }
+      });
+      
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error('Error generating AI sound:', error);
+      return res.status(500).json({ 
+        error: 'Error generating AI sound', 
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
+  // Save generated sound to samples library
+  app.post('/api/ai/save-sound', async (req: Request, res: Response) => {
+    try {
+      const { name, url, category, parameters, projectId } = req.body;
+      
+      if (!name || !url || !category) {
+        return res.status(400).json({ 
+          error: 'Name, URL, and category are required'
+        });
+      }
+      
+      // Save the sound to the samples library
+      const sample = await aiSoundService.saveSound(
+        name,
+        url,
+        category,
+        true, // isAIGenerated
+        JSON.stringify(parameters),
+        projectId ? parseInt(projectId) : undefined
+      );
+      
+      // Broadcast to connected clients
+      broadcastToClients(wss, {
+        type: 'sound_saved',
+        data: sample
+      });
+      
+      return res.status(201).json(sample);
+    } catch (error) {
+      console.error('Error saving AI sound:', error);
+      return res.status(500).json({ 
+        error: 'Error saving sound', 
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
   return httpServer;
 }

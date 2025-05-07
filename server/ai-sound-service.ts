@@ -90,9 +90,9 @@ export class AISoundService {
           toneJsCode
         }
       };
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error generating sound:", error);
-      throw new Error("Failed to generate sound: " + (error.message || "Unknown error"));
+      throw new Error("Failed to generate sound: " + ((error as Error)?.message || "Unknown error"));
     }
   }
 
@@ -179,10 +179,9 @@ Only provide the JavaScript code, no explanations before or after.`;
       // Create sample data
       const sampleData: SampleInsert = {
         name,
-        url,
+        audioUrl: url,
         category,
-        isAIGenerated,
-        metadata: parameters
+        tags: isAIGenerated ? ["AI-generated"] : []
       };
       
       // Save to database
