@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import useWebSocket, { ReadyState } from '@/hooks/use-websocket';
 import { Project, Track } from '@shared/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ResizableLayout, ModulePanel, PanelVisibilityProvider, usePanelVisibility } from '@/components/ResizableLayout';
 
 export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -186,136 +185,97 @@ export default function Home() {
     }
   };
 
-  const HomeContent = () => {
-    const { visiblePanels, togglePanelVisibility } = usePanelVisibility();
-    
-    return (
-      <div className="flex flex-col h-screen">
-        {/* Header */}
-        <MainHeader 
-          project={currentProject} 
-          isLoading={isLoadingProjects}
-        />
+  return (
+    <div className="flex flex-col h-screen">
+      {/* Header */}
+      <MainHeader 
+        project={currentProject} 
+        isLoading={isLoadingProjects}
+      />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar: Track List */}
+        <div className="w-64 bg-[#121212] border-r border-[#333333] flex flex-col">
+          <TrackList 
+            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
+            isLoading={isLoadingTracks} 
+            selectedTrackId={selectedTrack}
+            onSelectTrack={handleTrackSelect}
+          />
+        </div>
         
-        {/* Main Content Area with Resizable Modules */}
-        <div className="flex-1 flex overflow-hidden p-2 bg-[#1A1A1A] gap-2">
-          <ResizableLayout>
-            {/* Left Sidebar: Track List and Controls */}
-            <ModulePanel 
-              id="tracks" 
-              title="Tracks" 
-              defaultSize={20} 
-              minSize={15}
-              isVisible={visiblePanels.tracks}
-              toggleVisibility={togglePanelVisibility}
-              className="flex flex-col"
-            >
-              <TrackList 
+        {/* Main Content Area with Timeline Editor */}
+        <div className="flex-1 flex flex-col bg-[#121212] overflow-hidden">
+          <Timeline 
+            tracks={Array.isArray(tracksData) ? tracksData : undefined} 
+            isLoading={isLoadingTracks}
+            project={currentProject}
+          />
+          
+          <TransportControls 
+            tempo={currentProject?.tempo || 120}
+            socket={socket}
+          />
+        </div>
+        
+        {/* Right Sidebar: Mixer and AI Panels */}
+        <div className="w-96 bg-[#1A1A1A] border-l border-[#333333] flex flex-col">
+          <Tabs defaultValue="mixer" className="h-full">
+            <TabsList className="w-full grid grid-cols-3 mb-2">
+              <TabsTrigger value="mixer">Mixer</TabsTrigger>
+              <TabsTrigger value="mix-bot">Mix Bot</TabsTrigger>
+              <TabsTrigger value="mastering">Mastering</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="mixer" className="flex-1 overflow-y-auto px-1">
+              <MixerPanel 
                 tracks={Array.isArray(tracksData) ? tracksData : undefined} 
                 isLoading={isLoadingTracks} 
                 selectedTrackId={selectedTrack}
-                onSelectTrack={handleTrackSelect}
+                projectId={currentProject?.id}
               />
-            </ModulePanel>
+            </TabsContent>
             
-            {/* Center Area: Main Timeline Editor */}
-            <ModulePanel 
-              id="timeline" 
-              title="Timeline" 
-              defaultSize={60} 
-              minSize={40}
-              isVisible={visiblePanels.timeline}
-              toggleVisibility={togglePanelVisibility}
-              className="flex flex-col"
-            >
-              <Timeline 
-                tracks={Array.isArray(tracksData) ? tracksData : undefined} 
-                isLoading={isLoadingTracks}
-                project={currentProject}
+            <TabsContent value="mix-bot" className="flex-1 overflow-y-auto px-1">
+              <AutoMixPanel 
+                track={selectedTrack && tracksData ? 
+                  tracksData.find(t => t.id === selectedTrack) || null : null}
+                projectId={currentProject?.id !== undefined ? currentProject.id : null}
               />
-              
-              <TransportControls 
-                tempo={currentProject?.tempo || 120}
-                socket={socket}
-              />
-            </ModulePanel>
+            </TabsContent>
             
-            {/* Right Sidebar: Mixer and AI Modules */}
-            <ModulePanel 
-              id="mixer" 
-              title="Mixer & AI" 
-              defaultSize={25} 
-              minSize={20}
-              isVisible={visiblePanels.mixer}
-              toggleVisibility={togglePanelVisibility}
-              className="flex flex-col"
-            >
-              <Tabs defaultValue="mixer" className="h-full">
-                <TabsList className="w-full grid grid-cols-3 mb-2">
-                  <TabsTrigger value="mixer">Mixer</TabsTrigger>
-                  <TabsTrigger value="mix-bot">Mix Bot</TabsTrigger>
-                  <TabsTrigger value="mastering">Mastering</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="mixer" className="flex-1 overflow-y-auto px-1">
-                  <MixerPanel 
-                    tracks={Array.isArray(tracksData) ? tracksData : undefined} 
-                    isLoading={isLoadingTracks} 
-                    selectedTrackId={selectedTrack}
-                    projectId={currentProject?.id}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="mix-bot" className="flex-1 overflow-y-auto px-1">
-                  <AutoMixPanel 
-                    track={selectedTrack && tracksData ? 
-                      tracksData.find(t => t.id === selectedTrack) || null : null}
-                    projectId={currentProject?.id !== undefined ? currentProject.id : null}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="mastering" className="flex-1 overflow-y-auto px-1">
-                  <AutoMasteringPanel 
-                    projectId={currentProject?.id !== undefined ? currentProject.id : null}
-                  />
-                </TabsContent>
-              </Tabs>
-            </ModulePanel>
-          </ResizableLayout>
+            <TabsContent value="mastering" className="flex-1 overflow-y-auto px-1">
+              <AutoMasteringPanel 
+                projectId={currentProject?.id !== undefined ? currentProject.id : null}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
-        
-        {/* AI Assistant (Floating) */}
-        <ModulePanel 
-          id="aiAssistant" 
-          title="AI Assistant" 
-          defaultSize={20} 
-          minSize={20}
-          isVisible={visiblePanels.ai}
-          toggleVisibility={togglePanelVisibility}
-          className="fixed bottom-20 right-4 w-96 h-80 z-50 shadow-lg"
-        >
+      </div>
+      
+      {/* Fixed AI Command Interface */}
+      <div className="fixed bottom-28 left-1/2 transform -translate-x-1/2 w-96 z-50">
+        <div className="bg-[#1A1A1A] border border-[#333333] rounded-md shadow-xl">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-[#252525] border-b border-[#333333]">
+            <h3 className="text-sm font-medium">AI Assistant</h3>
+          </div>
           <AICommandInterface 
             onProcessCommand={handleProcessAICommand}
             isConnected={isConnected}
             projectId={currentProject?.id}
           />
-        </ModulePanel>
-        
-        {/* Add Track Button */}
-        <AddTrackDialog projectId={currentProject?.id} />
-        
-        {/* Footer Status Bar */}
-        <StatusFooter 
-          project={currentProject}
-          isConnected={isConnected}
-        />
+        </div>
       </div>
-    );
-  };
-  
-  return (
-    <PanelVisibilityProvider>
-      <HomeContent />
-    </PanelVisibilityProvider>
+      
+      {/* Add Track Button (Floating) */}
+      <AddTrackDialog projectId={currentProject?.id} />
+      
+      {/* Footer Status Bar */}
+      <StatusFooter 
+        project={currentProject}
+        isConnected={isConnected}
+      />
+    </div>
   );
 }

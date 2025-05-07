@@ -196,6 +196,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Duplicate an existing track
+  app.post('/api/tracks/:id/duplicate', async (req: Request, res: Response) => {
+    try {
+      const trackId = parseInt(req.params.id);
+      
+      // Get the original track
+      const originalTrack = await storage.getTrackById(trackId);
+      if (!originalTrack) {
+        return res.status(404).json({ error: 'Track not found' });
+      }
+      
+      // Create a new track with the same properties
+      const duplicateData = {
+        name: `${originalTrack.name} (Copy)`,
+        projectId: originalTrack.projectId,
+        type: originalTrack.type,
+        color: originalTrack.color,
+        isMuted: originalTrack.isMuted,
+        isSoloed: originalTrack.isSoloed,
+        isArmed: originalTrack.isArmed,
+        isAI: originalTrack.isAI,
+        position: originalTrack.position, 
+      };
+      
+      const newTrack = await storage.createTrack(duplicateData);
+      
+      // If the original track had clips, duplicate those too
+      const originalClips = await storage.getClipsByTrackId(trackId);
+      if (originalClips && originalClips.length > 0) {
+        for (const clip of originalClips) {
+          await storage.createClip({
+            trackId: newTrack.id,
+            name: clip.name,
+            startTime: clip.startTime,
+            duration: clip.duration,
+            audioUrl: clip.audioUrl,
+            waveformData: clip.waveformData,
+            color: clip.color
+          });
+        }
+      }
+      
+      // Broadcast track creation to connected clients
+      broadcastToClients(wss, {
+        type: 'track_created',
+        data: newTrack
+      });
+      
+      return res.status(201).json(newTrack);
+    } catch (error) {
+      console.error('Error duplicating track:', error);
+      return res.status(500).json({ error: 'Failed to duplicate track' });
+    }
+  });
+  
   // Clips API
   app.get('/api/tracks/:trackId/clips', async (req: Request, res: Response) => {
     try {

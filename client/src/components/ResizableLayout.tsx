@@ -186,7 +186,14 @@ interface PanelVisibilityContextType {
 }
 
 export const PanelVisibilityContext = React.createContext<PanelVisibilityContextType>({
-  visiblePanels: {},
+  visiblePanels: {
+    tracks: true,
+    mixer: true,
+    browser: true,
+    ai: true,
+    transport: true,
+    timeline: true,
+  },
   togglePanelVisibility: () => {},
 });
 
