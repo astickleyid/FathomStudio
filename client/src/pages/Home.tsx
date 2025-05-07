@@ -160,7 +160,7 @@ export default function Home() {
       
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar: Track List and AI Controls */}
-        <div className="w-64 bg-fathom-black border-r border-fathom-lightgray flex flex-col">
+        <div className="w-64 bg-[#121212] border-r border-[#333333] flex flex-col">
           <TrackList 
             tracks={tracksData} 
             isLoading={isLoadingTracks} 
@@ -175,7 +175,7 @@ export default function Home() {
         </div>
         
         {/* Main Content Area with Timeline Editor */}
-        <div className="flex-1 flex flex-col bg-fathom-black overflow-hidden">
+        <div className="flex-1 flex flex-col bg-[#121212] overflow-hidden">
           <Timeline 
             tracks={tracksData} 
             isLoading={isLoadingTracks}
@@ -189,7 +189,7 @@ export default function Home() {
         </div>
         
         {/* Right Sidebar: Mixer and Effect Panels */}
-        <div className="w-80 bg-fathom-darkgray border-l border-fathom-lightgray flex flex-col">
+        <div className="w-80 bg-[#1A1A1A] border-l border-[#333333] flex flex-col">
           <MixerPanel 
             tracks={tracksData} 
             isLoading={isLoadingTracks} 
